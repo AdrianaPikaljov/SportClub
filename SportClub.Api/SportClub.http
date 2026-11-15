@@ -1,0 +1,247 @@
+# SportClub API – test requests (Visual Studio / Rider / VS Code REST Client)
+# 1) Run the API (http://localhost:5080)
+# 2) Run a login request below and copy the "token" into the matching variable.
+
+@host = http://localhost:5080
+@clientToken = PASTE_CLIENT_TOKEN
+@adminToken = PASTE_ADMIN_TOKEN
+@trainerToken = PASTE_TRAINER_TOKEN
+@serviceToken = PASTE_SERVICE_TOKEN
+
+### ---------- Auth ----------
+
+### Login as client
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "klient@sportclub.ee", "password": "Klient123!" }
+
+### Login as admin
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "admin@sportclub.ee", "password": "Admin123!" }
+
+### Login as trainer
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "treener@sportclub.ee", "password": "Treener123!" }
+
+### Login as Service (Worker)
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "worker@sportclub.ee", "password": "Worker123!" }
+
+### Wrong password → 401 ProblemDetails
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "klient@sportclub.ee", "password": "vale" }
+
+### Register → 201 (validation errors → 400)
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{ "fullName": "Test Kasutaja", "email": "test@example.com", "password": "Parool123!" }
+
+### Who am I
+GET {{host}}/api/auth/me
+Authorization: Bearer {{clientToken}}
+
+### ---------- Timetable ----------
+
+### Timetable (filter + paging)
+GET {{host}}/api/sessions?from=2026-11-16T00:00:00Z&to=2026-11-23T00:00:00Z&type=1&page=1&pageSize=10
+
+### Search + sort
+GET {{host}}/api/sessions?search=kask&sort=-startsAt
+
+### One session
+GET {{host}}/api/sessions/1
+
+### Not found → 404
+GET {{host}}/api/sessions/99999
+
+### Create session (Admin) → 201
+POST {{host}}/api/sessions
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "trainingTypeId": 1, "trainerId": 1, "startsAt": "2026-12-01T05:00:00Z", "durationMinutes": 60, "room": "Saal 2", "maxParticipants": 15 }
+
+### Create session in the past → 400
+POST {{host}}/api/sessions
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "trainingTypeId": 1, "trainerId": 1, "startsAt": "2020-01-01T05:00:00Z", "durationMinutes": 60, "room": "Saal 2", "maxParticipants": 15 }
+
+### Client tries Admin endpoint → 403
+POST {{host}}/api/sessions
+Authorization: Bearer {{clientToken}}
+Content-Type: application/json
+
+{ "trainingTypeId": 1, "trainerId": 1, "startsAt": "2026-12-01T05:00:00Z", "durationMinutes": 60, "room": "Saal 2", "maxParticipants": 15 }
+
+### Update session (Admin)
+PUT {{host}}/api/sessions/1
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "trainingTypeId": 1, "trainerId": 1, "startsAt": "2026-12-01T05:00:00Z", "durationMinutes": 60, "room": "Saal 3", "maxParticipants": 16 }
+
+### Delete session (Admin) → 204, or 409 if it has bookings
+DELETE {{host}}/api/sessions/2
+Authorization: Bearer {{adminToken}}
+
+### ---------- Booking ----------
+# Crossfit sessions (type=5) have only 3 places – easy to test "full".
+
+### Book a spot → 201, 409 if full
+POST {{host}}/api/sessions/5/bookings
+Authorization: Bearer {{clientToken}}
+
+### Join waitlist (only when full) → 201
+POST {{host}}/api/sessions/5/waitlist
+Authorization: Bearer {{clientToken}}
+
+### My bookings
+GET {{host}}/api/bookings/my
+Authorization: Bearer {{clientToken}}
+
+### Cancel booking → 204
+DELETE {{host}}/api/bookings/1
+Authorization: Bearer {{clientToken}}
+
+### My waitlist places
+GET {{host}}/api/waitlist/my
+Authorization: Bearer {{clientToken}}
+
+### Leave waitlist → 204
+DELETE {{host}}/api/waitlist/1
+Authorization: Bearer {{clientToken}}
+
+### Pass plans on sale (no login needed)
+GET {{host}}/api/pass-plans
+
+### Buy a monthly pass (payment simulated) → 201; 409 if a next pass is already waiting
+POST {{host}}/api/passes/purchase
+Authorization: Bearer {{clientToken}}
+Content-Type: application/json
+
+{ "planId": 3 }
+
+### My monthly pass
+GET {{host}}/api/passes/my
+Authorization: Bearer {{clientToken}}
+
+### My notifications
+GET {{host}}/api/notifications/my
+Authorization: Bearer {{clientToken}}
+
+### ---------- Trainer ----------
+
+### My sessions (trainer)
+GET {{host}}/api/sessions/mine
+Authorization: Bearer {{trainerToken}}
+
+### Participants of a session
+GET {{host}}/api/sessions/5/participants
+Authorization: Bearer {{trainerToken}}
+
+### Mark attendance (from 30 min before the start)
+PATCH {{host}}/api/bookings/1/attendance
+Authorization: Bearer {{trainerToken}}
+Content-Type: application/json
+
+{ "attended": true }
+
+### Popular trainings
+GET {{host}}/api/stats/popular?top=5
+Authorization: Bearer {{trainerToken}}
+
+### ---------- Catalog (Admin) ----------
+
+### Trainers (search, sort, paging)
+GET {{host}}/api/trainers?search=saar&sort=name&page=1&pageSize=10
+Authorization: Bearer {{adminToken}}
+
+### Create trainer
+POST {{host}}/api/trainers
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "fullName": "Uus Treener", "bio": "Zumba ja tantsutreeningud", "phone": "+372 5555 9999" }
+
+### Update trainer
+PUT {{host}}/api/trainers/1
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "fullName": "Kertu Saar", "bio": "Joogaõpetaja", "phone": "+372 5550 0001" }
+
+### Delete trainer → 409 if trainer has sessions
+DELETE {{host}}/api/trainers/1
+Authorization: Bearer {{adminToken}}
+
+### Training types
+GET {{host}}/api/training-types?sort=-name
+
+### Create training type
+POST {{host}}/api/training-types
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "name": "Zumba", "description": "Tantsuline treening", "intensity": "Keskmine" }
+
+### Create pass plan (Admin)
+POST {{host}}/api/pass-plans
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "name": "Kuukaart 16", "description": "4 korda nädalas", "visits": 16, "durationDays": 30, "price": 59.00, "isActive": true }
+
+### All plans incl. inactive (Admin)
+GET {{host}}/api/pass-plans?includeInactive=true&sort=-price
+Authorization: Bearer {{adminToken}}
+
+### Delete plan → 409 if it has been bought (deactivate instead)
+DELETE {{host}}/api/pass-plans/3
+Authorization: Bearer {{adminToken}}
+
+### Users (Admin)
+GET {{host}}/api/users?role=Client
+Authorization: Bearer {{adminToken}}
+
+### All passes (Admin)
+GET {{host}}/api/passes
+Authorization: Bearer {{adminToken}}
+
+### Give a monthly pass (Admin)
+POST {{host}}/api/passes
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "userId": 4, "validFrom": "2026-12-01T00:00:00Z", "validUntil": "2026-12-31T23:59:59Z", "visitsTotal": 12 }
+
+### ---------- Worker endpoints (Service) ----------
+
+### Promote waitlist
+POST {{host}}/api/waitlist/promote
+Authorization: Bearer {{serviceToken}}
+
+### Sessions starting within 60 minutes
+GET {{host}}/api/sessions/starting?within=60
+Authorization: Bearer {{serviceToken}}
+
+### Send reminder
+POST {{host}}/api/notifications
+Authorization: Bearer {{serviceToken}}
+Content-Type: application/json
+
+{ "sessionId": 1 }
+
+### WebSocket (not testable here): ws://localhost:5080/ws/sessions?access_token={{clientToken}}
+### Message: {"sessionId":5,"free":1,"type":"FreeSpotsChanged"}
