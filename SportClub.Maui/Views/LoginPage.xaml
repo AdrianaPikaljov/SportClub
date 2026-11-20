@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SportClub.Maui.ViewModels"
+             x:Class="SportClub.Maui.Views.LoginPage"
+             x:DataType="vm:LoginViewModel"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{StaticResource Ink}">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="28,64,28,40" RowSpacing="0">
+
+        <HorizontalStackLayout Spacing="10">
+            <Border BackgroundColor="{StaticResource Accent}" StrokeThickness="0" WidthRequest="44" HeightRequest="44"
+                    StrokeShape="RoundRectangle 12">
+                <Label Text="SC" FontFamily="OpenSansSemibold" FontSize="16" TextColor="{StaticResource Ink}"
+                       HorizontalOptions="Center" VerticalOptions="Center" />
+            </Border>
+            <Label Text="SportClub" FontFamily="OpenSansSemibold" FontSize="22" TextColor="{StaticResource Ground}" VerticalOptions="Center" />
+        </HorizontalStackLayout>
+
+        <VerticalStackLayout Grid.Row="1" Margin="0,56,0,0" Spacing="14">
+            <Label Text="Broneeri trenn paari puudutusega." FontFamily="OpenSansSemibold" FontSize="36" LineHeight="1.05"
+                   TextColor="{StaticResource Ground}" />
+            <Label Text="Vaata tunniplaani, broneeri koht ja saa teade, kui ootejärjekorras koht vabaneb."
+                   FontSize="16" TextColor="#B7BCC4" />
+        </VerticalStackLayout>
+
+        <VerticalStackLayout Grid.Row="3" Spacing="12">
+            <Label Text="E-post" FontSize="13" TextColor="#B7BCC4" />
+            <Border Style="{StaticResource DarkInput}">
+                <Entry Text="{Binding Email}" Keyboard="Email" TextColor="{StaticResource Ground}" Placeholder="nimi@example.com"
+                       PlaceholderColor="#6E747D" />
+            </Border>
+            <Label Text="Parool" FontSize="13" TextColor="#B7BCC4" />
+            <Border Style="{StaticResource DarkInput}">
+                <Entry Text="{Binding Password}" IsPassword="True" TextColor="{StaticResource Ground}" ReturnCommand="{Binding LoginCommand}" />
+            </Border>
+
+            <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextColor="#FF9C70" FontSize="14" />
+
+            <Button Text="Logi sisse" Command="{Binding LoginCommand}" Style="{StaticResource AccentButton}" Margin="0,8,0,0" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{StaticResource Accent}" />
+            <Button Text="Pole kontot? Registreeru" Command="{Binding GoToRegisterCommand}" BackgroundColor="Transparent"
+                    TextColor="{StaticResource Ground}" FontFamily="OpenSansSemibold" FontSize="14" HeightRequest="44" />
+            <Label Text="Demo: klient@sportclub.ee / Klient123!  ·  treener@sportclub.ee / Treener123!"
+                   FontSize="12" TextColor="#8E949D" HorizontalTextAlignment="Center" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>
