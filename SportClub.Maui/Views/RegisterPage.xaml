@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SportClub.Maui.ViewModels"
+             x:Class="SportClub.Maui.Views.RegisterPage"
+             x:DataType="vm:RegisterViewModel"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{StaticResource Ink}">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="28,48,28,40" Spacing="12">
+            <Button Text="‹ Tagasi" Command="{Binding BackCommand}" HorizontalOptions="Start" BackgroundColor="#262A30"
+                    TextColor="{StaticResource Ground}" CornerRadius="12" HeightRequest="44" Padding="14,0" FontFamily="OpenSansSemibold" />
+
+            <Label Text="Loo konto" FontFamily="OpenSansSemibold" FontSize="36" TextColor="{StaticResource Ground}" Margin="0,24,0,0" />
+            <Label Text="Pärast registreerimist saad osta kuukaardi ja broneerida treeninguid." FontSize="15" TextColor="#B7BCC4" Margin="0,0,0,12" />
+
+            <Label Text="Nimi" FontSize="13" TextColor="#B7BCC4" />
+            <Border Style="{StaticResource DarkInput}">
+                <Entry Text="{Binding FullName}" TextColor="{StaticResource Ground}" Placeholder="Mari Tamm" PlaceholderColor="#6E747D" />
+            </Border>
+
+            <Label Text="E-post" FontSize="13" TextColor="#B7BCC4" />
+            <Border Style="{StaticResource DarkInput}">
+                <Entry Text="{Binding Email}" Keyboard="Email" TextColor="{StaticResource Ground}" Placeholder="nimi@example.com" PlaceholderColor="#6E747D" />
+            </Border>
+
+            <Label Text="Parool (vähemalt 8 tähemärki)" FontSize="13" TextColor="#B7BCC4" />
+            <Border Style="{StaticResource DarkInput}">
+                <Entry Text="{Binding Password}" IsPassword="True" TextColor="{StaticResource Ground}" />
+            </Border>
+
+            <Label Text="Parool uuesti" FontSize="13" TextColor="#B7BCC4" />
+            <Border Style="{StaticResource DarkInput}">
+                <Entry Text="{Binding ConfirmPassword}" IsPassword="True" TextColor="{StaticResource Ground}" ReturnCommand="{Binding RegisterCommand}" />
+            </Border>
+
+            <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextColor="#FF9C70" FontSize="14" />
+
+            <Button Text="Registreeru" Command="{Binding RegisterCommand}" Style="{StaticResource AccentButton}" Margin="0,8,0,0" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{StaticResource Accent}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

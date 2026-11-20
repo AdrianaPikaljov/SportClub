@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SportClub.Maui.ViewModels"
+             x:Class="SportClub.Maui.Views.BuyPassPage"
+             x:DataType="vm:BuyPassViewModel"
+             Title="Osta kuukaart"
+             BackgroundColor="{StaticResource Ground}">
+
+    <Grid RowDefinitions="*,Auto">
+        <ScrollView>
+            <VerticalStackLayout Padding="20,16,20,16" Spacing="12">
+                <Label Text="Vali pakett" Style="{StaticResource PageTitle}" />
+                <Label Text="Iga broneering kasutab ühe külastuse. Tühistamisel saad külastuse tagasi." FontSize="14" TextColor="{StaticResource Muted}" />
+
+                <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+
+                <VerticalStackLayout Spacing="10" BindableLayout.ItemsSource="{Binding Plans}">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PlanItem">
+                            <Border BackgroundColor="{Binding Background}" Stroke="{Binding StrokeColor}" StrokeThickness="1.5"
+                                    StrokeShape="RoundRectangle 18" Padding="18,16">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:BuyPassViewModel}}, Path=SelectCommand}"
+                                                          CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="4">
+                                    <Label Text="{Binding Name}" FontFamily="OpenSansSemibold" FontSize="18" TextColor="{Binding TextColor}" />
+                                    <Label Grid.Column="1" Text="{Binding PriceText}" FontFamily="OpenSansSemibold" FontSize="20" TextColor="{Binding TextColor}" />
+                                    <Label Grid.Row="1" Text="{Binding VisitsText}" FontSize="14" TextColor="{Binding SubTextColor}" />
+                                    <Label Grid.Row="1" Grid.Column="1" Text="{Binding PerVisitText}" FontSize="12" TextColor="{Binding SubTextColor}" HorizontalTextAlignment="End" />
+                                    <Label Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Description}" FontSize="13" TextColor="{Binding SubTextColor}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+
+                <Border Style="{StaticResource Card}" Padding="16,14">
+                    <Label Text="{Binding StartInfo}" FontSize="14" TextColor="{StaticResource Ink2}" />
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <VerticalStackLayout Grid.Row="1" Padding="20,8,20,28" Spacing="8">
+            <Button Text="{Binding BuyText}" Command="{Binding BuyCommand}" IsEnabled="{Binding HasSelection}" Style="{StaticResource AccentButton}" />
+            <Label Text="Makse on simuleeritud – päris raha ei võeta." FontSize="12" TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{StaticResource Ink}" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>
