@@ -53,13 +53,8 @@ public static class MauiProgram
             handler.PlatformView.BackgroundTintList =
                 Android.Content.Res.ColorStateList.ValueOf(Android.Graphics.Color.Transparent);
 #elif WINDOWS
+            // Only the border thickness – changing WinUI theme resources here crashed the app on Windows.
             handler.PlatformView.BorderThickness = new Microsoft.UI.Xaml.Thickness(0);
-            handler.PlatformView.Resources["TextControlBorderThemeThicknessFocused"] = new Microsoft.UI.Xaml.Thickness(0);
-            handler.PlatformView.Resources["TextControlBackgroundFocused"] =
-                new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent);
-            handler.PlatformView.Resources["TextControlBackgroundPointerOver"] =
-                new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent);
-            handler.PlatformView.Background = null;
 #endif
         });
 
