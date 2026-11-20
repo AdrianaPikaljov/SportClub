@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="SportClub.Api/SportClub.Api.csproj" />
+  <Project Path="SportClub.Core/SportClub.Core.csproj" />
+  <Project Path="SportClub.Infrastructure/SportClub.Infrastructure.csproj" />
+  <Project Path="SportClub.Tests/SportClub.Tests.csproj" />
+</Solution>
