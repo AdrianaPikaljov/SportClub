@@ -1,4 +1,10 @@
 <Solution>
+  <Folder Name="/SportClub.Admin/">
+    <File Path="SportClub.Admin/package.json" />
+    <File Path="SportClub.Admin/vite.config.js" />
+    <File Path="SportClub.Admin/index.html" />
+    <File Path="SportClub.Admin/.env" />
+  </Folder>
   <Project Path="SportClub.Api/SportClub.Api.csproj" />
   <Project Path="SportClub.Core/SportClub.Core.csproj" />
   <Project Path="SportClub.Infrastructure/SportClub.Infrastructure.csproj" />
