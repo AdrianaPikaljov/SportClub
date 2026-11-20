@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SportClub.Maui.ViewModels"
+             x:Class="SportClub.Maui.Views.SchedulePage"
+             x:DataType="vm:ScheduleViewModel"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{StaticResource Ground}">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="20,40,20,0" RowSpacing="14">
+
+        <Grid ColumnDefinitions="*,Auto">
+            <Label Text="Tunniplaan" Style="{StaticResource PageTitle}" />
+            <HorizontalStackLayout Grid.Column="1" Spacing="6" VerticalOptions="Center" IsVisible="{Binding IsLive}">
+                <Ellipse Fill="#1F8A4C" WidthRequest="8" HeightRequest="8" VerticalOptions="Center" />
+                <Label Text="Reaalajas" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ink2}" />
+            </HorizontalStackLayout>
+        </Grid>
+
+        <!-- Week days -->
+        <CollectionView Grid.Row="1" ItemsSource="{Binding Days}" HeightRequest="60">
+            <CollectionView.ItemsLayout>
+                <GridItemsLayout Orientation="Vertical" Span="7" HorizontalItemSpacing="6" />
+            </CollectionView.ItemsLayout>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="vm:DayItem">
+                    <Border BackgroundColor="{Binding Background}" Stroke="{StaticResource Line}" StrokeShape="RoundRectangle 12"
+                            HeightRequest="56" Padding="0">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:ScheduleViewModel}}, Path=SelectDayCommand}"
+                                                  CommandParameter="{Binding .}" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout VerticalOptions="Center" Spacing="0">
+                            <Label Text="{Binding WeekDay}" FontSize="11" TextColor="{Binding TextColor}" HorizontalTextAlignment="Center" Opacity="0.75" />
+                            <Label Text="{Binding Number}" FontSize="17" FontFamily="OpenSansSemibold" TextColor="{Binding TextColor}" HorizontalTextAlignment="Center" />
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Training type chips -->
+        <CollectionView Grid.Row="2" ItemsSource="{Binding Types}" HeightRequest="40">
+            <CollectionView.ItemsLayout>
+                <LinearItemsLayout Orientation="Horizontal" ItemSpacing="8" />
+            </CollectionView.ItemsLayout>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="vm:ChipItem">
+                    <Border BackgroundColor="{Binding Background}" Stroke="#D5D8D2" StrokeShape="RoundRectangle 18" Padding="14,0" HeightRequest="36">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:ScheduleViewModel}}, Path=SelectTypeCommand}"
+                                                  CommandParameter="{Binding .}" />
+                        </Border.GestureRecognizers>
+                        <Label Text="{Binding Label}" FontSize="13" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ink}" VerticalOptions="Center" />
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Sessions -->
+        <RefreshView Grid.Row="3" Command="{Binding LoadCommand}" IsRefreshing="{Binding IsBusy}">
+            <CollectionView ItemsSource="{Binding Sessions}">
+                <CollectionView.Header>
+                    <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+                </CollectionView.Header>
+                <CollectionView.EmptyView>
+                    <Label Text="Sel päeval treeninguid pole." TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" Margin="0,40" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="10" />
+                </CollectionView.ItemsLayout>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SessionItem">
+                        <Border Style="{StaticResource Card}" Padding="16,14">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:ScheduleViewModel}}, Path=OpenCommand}"
+                                                      CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+                            <Grid ColumnDefinitions="56,*,Auto" ColumnSpacing="12">
+                                <VerticalStackLayout VerticalOptions="Center">
+                                    <Label Text="{Binding Time}" FontFamily="OpenSansSemibold" FontSize="18" TextColor="{StaticResource Ink}" />
+                                    <Label Text="{Binding Duration}" FontSize="12" TextColor="{StaticResource Muted}" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
+                                    <Label Text="{Binding Name}" FontFamily="OpenSansSemibold" FontSize="16" TextColor="{StaticResource Ink}" />
+                                    <Label Text="{Binding Subtitle}" FontSize="13" TextColor="{StaticResource Muted}" />
+                                </VerticalStackLayout>
+                                <Border Grid.Column="2" BackgroundColor="{Binding BadgeBackground}" StrokeThickness="0" StrokeShape="RoundRectangle 10"
+                                        Padding="10,6" VerticalOptions="Center">
+                                    <Label Text="{Binding Badge}" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{Binding BadgeTextColor}" />
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </RefreshView>
+    </Grid>
+</ContentPage>

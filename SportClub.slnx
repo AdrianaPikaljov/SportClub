@@ -2,5 +2,7 @@
   <Project Path="SportClub.Api/SportClub.Api.csproj" />
   <Project Path="SportClub.Core/SportClub.Core.csproj" />
   <Project Path="SportClub.Infrastructure/SportClub.Infrastructure.csproj" />
+  <Project Path="SportClub.Maui/SportClub.Maui.csproj" Id="db9c0ec7-4cad-4d67-812c-0e619ac3038a" />
   <Project Path="SportClub.Tests/SportClub.Tests.csproj" />
+  <Project Path="SportClub.Worker/SportClub.Worker.csproj" />
 </Solution>

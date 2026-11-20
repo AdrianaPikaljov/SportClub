@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SportClub.Maui.ViewModels"
+             x:Class="SportClub.Maui.Views.SessionDetailPage"
+             x:DataType="vm:SessionDetailViewModel"
+             Title="Treening"
+             BackgroundColor="{StaticResource Ground}">
+
+    <Grid RowDefinitions="*,Auto">
+        <ScrollView>
+            <VerticalStackLayout Spacing="0">
+                <!-- Dark header -->
+                <Border BackgroundColor="{StaticResource Ink}" StrokeThickness="0" StrokeShape="RoundRectangle 0,0,28,28" Padding="20,20,20,28">
+                    <VerticalStackLayout Spacing="16">
+                        <Border BackgroundColor="{Binding Session.BadgeBackground}" StrokeThickness="0" StrokeShape="RoundRectangle 10"
+                                Padding="12,6" HorizontalOptions="Start">
+                            <Label Text="{Binding Session.Badge}" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{Binding Session.BadgeTextColor}" />
+                        </Border>
+                        <Label Text="{Binding Session.Name}" FontFamily="OpenSansSemibold" FontSize="36" TextColor="{StaticResource Ground}" />
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="14" RowSpacing="14">
+                            <VerticalStackLayout>
+                                <Label Text="Aeg" FontSize="12" TextColor="#9EA4AD" />
+                                <Label Text="{Binding When}" FontSize="14" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ground}" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1">
+                                <Label Text="Ruum" FontSize="12" TextColor="#9EA4AD" />
+                                <Label Text="{Binding Session.Dto.Room}" FontSize="14" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ground}" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="1">
+                                <Label Text="Treener" FontSize="12" TextColor="#9EA4AD" />
+                                <Label Text="{Binding Session.Dto.TrainerName}" FontSize="14" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ground}" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Row="1" Grid.Column="1">
+                                <Label Text="Kestus" FontSize="12" TextColor="#9EA4AD" />
+                                <Label Text="{Binding Session.Duration}" FontSize="14" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ground}" />
+                            </VerticalStackLayout>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout Padding="20" Spacing="14">
+                    <Border Style="{StaticResource Card}" Padding="18">
+                        <VerticalStackLayout Spacing="12">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label VerticalOptions="End">
+                                    <Label.FormattedText>
+                                        <FormattedString>
+                                            <Span Text="{Binding Session.FreeSpots}" FontFamily="OpenSansSemibold" FontSize="28" TextColor="{StaticResource Ink}" />
+                                            <Span Text="  vaba kohta" FontSize="16" TextColor="{StaticResource Muted}" />
+                                        </FormattedString>
+                                    </Label.FormattedText>
+                                </Label>
+                                <Label Grid.Column="1" Text="{Binding Session.BookedText, StringFormat='{0} broneeritud'}" FontSize="13"
+                                       TextColor="{StaticResource Muted}" VerticalOptions="End" />
+                            </Grid>
+                            <ProgressBar Progress="{Binding Progress}" ProgressColor="{StaticResource Ink}" HeightRequest="10" />
+                            <HorizontalStackLayout Spacing="6">
+                                <Ellipse Fill="#1F8A4C" WidthRequest="8" HeightRequest="8" VerticalOptions="Center" />
+                                <Label Text="Uueneb reaalajas" FontSize="12" TextColor="{StaticResource Ink2}" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Padding="16,14">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="{Binding PassInfo}" FontSize="14" TextColor="{StaticResource Ink2}" />
+                            <Button Text="Osta kuukaart" Command="{Binding BuyPassCommand}" Style="{StaticResource DarkButton}"
+                                    HeightRequest="48" FontSize="15" IsVisible="{Binding HasNoPass}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Padding="16,14" IsVisible="{Binding Session.IsFull}" BackgroundColor="{StaticResource Ink}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Kuidas ootejärjekord töötab?" FontFamily="OpenSansSemibold" FontSize="17" TextColor="{StaticResource Ground}" />
+                            <Label Text="Kui keegi tühistab, viiakse järjekorras esimene automaatselt treeningule ja kuukaardilt arvestatakse külastus alles siis."
+                                   FontSize="14" TextColor="#C9CDD3" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <VerticalStackLayout Grid.Row="1" Padding="20,8,20,28" Spacing="10">
+            <Label Text="Sul on sellele treeningule broneering ✓" IsVisible="{Binding IsBooked}" HorizontalTextAlignment="Center"
+                   FontFamily="OpenSansSemibold" TextColor="#17663A" />
+            <Grid IsVisible="{Binding IsNotBusy}">
+                <Button Text="Broneeri koht" Command="{Binding BookCommand}" Style="{StaticResource AccentButton}">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding Session.IsFull}" Value="True">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsBooked}" Value="True">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+                <Button Text="Pane mind ootejärjekorda" Command="{Binding JoinWaitlistCommand}" Style="{StaticResource DarkButton}"
+                        IsVisible="{Binding Session.IsFull}">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsBooked}" Value="True">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+            </Grid>
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{StaticResource Ink}" />
+        </VerticalStackLayout>
+    </Grid>
+</ContentPage>
