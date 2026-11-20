@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:SportClub.Maui.ViewModels"
+             x:Class="SportClub.Maui.Views.TrainerSessionsPage"
+             x:DataType="vm:TrainerSessionsViewModel"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{StaticResource Ground}">
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="20,40,20,0" RowSpacing="12">
+        <Grid ColumnDefinitions="*,Auto">
+            <VerticalStackLayout>
+                <Label Text="{Binding Greeting}" FontSize="14" TextColor="{StaticResource Muted}" />
+                <Label Text="Minu treeningud" Style="{StaticResource PageTitle}" />
+            </VerticalStackLayout>
+            <Button Grid.Column="1" Text="Logi välja" Command="{Binding LogoutCommand}" Style="{StaticResource OutlineButton}" VerticalOptions="End" />
+        </Grid>
+
+        <Label Grid.Row="1" Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+
+        <!-- Next session -->
+        <Border Grid.Row="2" BackgroundColor="{StaticResource Ink}" StrokeThickness="0" StrokeShape="RoundRectangle 20" Padding="20" IsVisible="{Binding HasNext}">
+            <Border.GestureRecognizers>
+                <TapGestureRecognizer Command="{Binding OpenCommand}" CommandParameter="{Binding Next}" />
+            </Border.GestureRecognizers>
+            <VerticalStackLayout Spacing="12">
+                <Border BackgroundColor="{StaticResource Accent}" StrokeThickness="0" StrokeShape="RoundRectangle 9" Padding="10,5" HorizontalOptions="Start">
+                    <Label Text="{Binding NextLabel}" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ink}" />
+                </Border>
+                <Label FontFamily="OpenSansSemibold" FontSize="26" TextColor="{StaticResource Ground}">
+                    <Label.FormattedText>
+                        <FormattedString>
+                            <Span Text="{Binding Next.Name}" />
+                            <Span Text=" · " />
+                            <Span Text="{Binding Next.Time}" />
+                        </FormattedString>
+                    </Label.FormattedText>
+                </Label>
+                <Label FontSize="14" TextColor="#B7BCC4">
+                    <Label.FormattedText>
+                        <FormattedString>
+                            <Span Text="{Binding Next.Dto.Room}" />
+                            <Span Text=" · " />
+                            <Span Text="{Binding Next.BookedText}" />
+                            <Span Text=" osalejat" />
+                        </FormattedString>
+                    </Label.FormattedText>
+                </Label>
+                <Border BackgroundColor="{StaticResource Ground}" StrokeThickness="0" StrokeShape="RoundRectangle 14" HeightRequest="48">
+                    <Label Text="Märgi kohalolu" FontFamily="OpenSansSemibold" FontSize="15" TextColor="{StaticResource Ink}"
+                           HorizontalOptions="Center" VerticalOptions="Center" />
+                </Border>
+            </VerticalStackLayout>
+        </Border>
+
+        <RefreshView Grid.Row="3" Command="{Binding LoadCommand}" IsRefreshing="{Binding IsBusy}">
+            <CollectionView ItemsSource="{Binding Sessions}">
+                <CollectionView.Header>
+                    <Label Text="Tulevased" FontSize="13" FontFamily="OpenSansSemibold" TextColor="{StaticResource Muted}" Margin="0,4,0,8" />
+                </CollectionView.Header>
+                <CollectionView.EmptyView>
+                    <Label Text="Tulevasi treeninguid pole." TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" Margin="0,30" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemsLayout>
+                    <LinearItemsLayout Orientation="Vertical" ItemSpacing="10" />
+                </CollectionView.ItemsLayout>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SessionItem">
+                        <Border Style="{StaticResource Card}" Padding="16,14">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:TrainerSessionsViewModel}}, Path=OpenCommand}"
+                                                      CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+                            <Grid ColumnDefinitions="72,*,Auto" ColumnSpacing="12">
+                                <VerticalStackLayout VerticalOptions="Center">
+                                    <Label Text="{Binding Day}" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{StaticResource Muted}" />
+                                    <Label Text="{Binding Time}" FontSize="18" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ink}" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                    <Label Text="{Binding Name}" FontSize="16" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ink}" />
+                                    <Label Text="{Binding Dto.Room}" FontSize="13" TextColor="{StaticResource Muted}" />
+                                </VerticalStackLayout>
+                                <Label Grid.Column="2" Text="{Binding BookedText}" FontSize="14" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ink}" VerticalOptions="Center" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </RefreshView>
+    </Grid>
+</ContentPage>

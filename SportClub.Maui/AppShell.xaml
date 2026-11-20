@@ -3,12 +3,39 @@
     x:Class="SportClub.Maui.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:local="clr-namespace:SportClub.Maui"
-    Title="SportClub.Maui">
+    xmlns:views="clr-namespace:SportClub.Maui.Views"
+    Title="SportClub"
+    Shell.TabBarBackgroundColor="White"
+    Shell.TabBarForegroundColor="{StaticResource Ink}"
+    Shell.TabBarTitleColor="{StaticResource Ink}"
+    Shell.TabBarUnselectedColor="{StaticResource Muted}"
+    Shell.BackgroundColor="{StaticResource Ink}"
+    Shell.ForegroundColor="{StaticResource Ground}"
+    Shell.TitleColor="{StaticResource Ground}">
 
-    <ShellContent
-        Title="Home"
-        ContentTemplate="{DataTemplate local:MainPage}"
-        Route="MainPage" />
+    <!-- Login (no tabs) -->
+    <ShellContent Route="login" ContentTemplate="{DataTemplate views:LoginPage}" Shell.FlyoutBehavior="Disabled" />
 
+    <!-- Client tabs -->
+    <TabBar Route="client">
+        <Tab Title="Tunniplaan" Icon="tab_schedule.png">
+            <ShellContent Route="schedule" ContentTemplate="{DataTemplate views:SchedulePage}" />
+        </Tab>
+        <Tab Title="Broneeringud" Icon="tab_bookings.png">
+            <ShellContent Route="bookings" ContentTemplate="{DataTemplate views:BookingsPage}" />
+        </Tab>
+        <Tab Title="Kuukaart" Icon="tab_card.png">
+            <ShellContent Route="pass" ContentTemplate="{DataTemplate views:PassPage}" />
+        </Tab>
+    </TabBar>
+
+    <!-- Trainer tabs -->
+    <TabBar Route="trainer">
+        <Tab Title="Treeningud" Icon="tab_schedule.png">
+            <ShellContent Route="sessions" ContentTemplate="{DataTemplate views:TrainerSessionsPage}" />
+        </Tab>
+        <Tab Title="Statistika" Icon="tab_stats.png">
+            <ShellContent Route="stats" ContentTemplate="{DataTemplate views:StatsPage}" />
+        </Tab>
+    </TabBar>
 </Shell>
