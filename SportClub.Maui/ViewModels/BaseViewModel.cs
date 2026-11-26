@@ -13,13 +13,24 @@ public abstract partial class BaseViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasError))]
     private string? errorMessage;
 
+    /// <summary>
+    /// RefreshView ("tõmba alla") oma lipp. Eraldi IsBusy-st, sest iOS-is kirjutab RefreshView selle ise true-ks
+    /// ja kui see oleks IsBusy, jääks rakendus "laadima" ning ükski nupp (nt Tühista) ei töötaks.
+    /// </summary>
+    [ObservableProperty]
+    private bool isRefreshing;
+
     public bool IsNotBusy => !IsBusy;
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
     /// <summary>Runs an API call with busy flag and friendly error message.</summary>
     protected async Task RunAsync(Func<Task> action)
     {
-        if (IsBusy) return;
+        if (IsBusy)
+        {
+            IsRefreshing = false;
+            return;
+        }
         IsBusy = true;
         ErrorMessage = null;
         try
@@ -37,6 +48,7 @@ public abstract partial class BaseViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            IsRefreshing = false;
         }
     }
 

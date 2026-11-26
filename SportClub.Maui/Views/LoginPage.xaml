@@ -9,6 +9,7 @@
              Shell.NavBarIsVisible="False"
              BackgroundColor="{DynamicResource Panel}">
 
+    <ScrollView>
     <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="28,64,28,40" RowSpacing="0">
 
         <Grid ColumnDefinitions="*,Auto">
@@ -30,13 +31,23 @@
                    FontSize="16" TextColor="#B7BCC4" />
         </VerticalStackLayout>
 
-        <VerticalStackLayout Grid.Row="3" Spacing="12">
-            <!-- Ainult telefonis: arvuti aadress, kus API töötab (start.bat näitab seda) -->
-            <Label Text="{loc:T login.server}" FontSize="13" TextColor="#B7BCC4" IsVisible="{Binding ShowServer}" />
-            <Border Style="{StaticResource DarkInput}" IsVisible="{Binding ShowServer}">
-                <Entry Text="{Binding ServerUrl}" Keyboard="Url" TextColor="{StaticResource OnPanel}" Placeholder="http://192.168.1.15:5080"
-                       PlaceholderColor="#6E747D" />
-            </Border>
+        <VerticalStackLayout Grid.Row="3" Spacing="12" Margin="0,32,0,0">
+            <!-- Telefonis otsitakse server ise üles. Olek näidatakse ainult otsingu ajal või kui serverit ei leitud;
+                 siis ilmub ka väli aadressi käsitsi sisestamiseks. -->
+            <HorizontalStackLayout Spacing="8" IsVisible="{Binding HasServerStatus}">
+                <ActivityIndicator IsRunning="{Binding IsSearching}" IsVisible="{Binding IsSearching}" Color="{StaticResource Accent}"
+                                   WidthRequest="16" HeightRequest="16" />
+                <Label Text="{Binding ServerStatus}" FontSize="12" TextColor="#8E949D" VerticalOptions="Center" LineBreakMode="WordWrap" />
+            </HorizontalStackLayout>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding ShowManualServer}">
+                <Border Style="{StaticResource DarkInput}">
+                    <Entry Text="{Binding ServerUrl}" Keyboard="Url" TextColor="{StaticResource OnPanel}" Placeholder="192.168.1.15"
+                           PlaceholderColor="#6E747D" />
+                </Border>
+                <Button Grid.Column="1" Text="{loc:T server.find}" Command="{Binding FindServerCommand}"
+                        BackgroundColor="#2A2E35" TextColor="{StaticResource OnPanel}" FontFamily="OpenSansSemibold" FontSize="14"
+                        CornerRadius="14" Padding="16,0" />
+            </Grid>
             <Label Text="{loc:T login.email}" FontSize="13" TextColor="#B7BCC4" />
             <Border Style="{StaticResource DarkInput}">
                 <Entry Text="{Binding Email}" Keyboard="Email" TextColor="{StaticResource OnPanel}" Placeholder="nimi@example.com"
@@ -57,4 +68,5 @@
                    FontSize="12" TextColor="#8E949D" HorizontalTextAlignment="Center" />
         </VerticalStackLayout>
     </Grid>
+    </ScrollView>
 </ContentPage>

@@ -11,3 +11,5 @@ dist/
 TestResults/
 appsettings.Local.json
 logs/
+
+.DS_Store

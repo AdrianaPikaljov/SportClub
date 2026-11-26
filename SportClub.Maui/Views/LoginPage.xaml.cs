@@ -11,4 +11,11 @@ public partial class LoginPage : ContentPage
         InitializeComponent();
         BindingContext = _vm = vm;
     }
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        // telefonis otsitakse server ise üles
+        _ = _vm.FindServerAsync();
+    }
 }

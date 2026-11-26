@@ -151,6 +151,8 @@ app.Map("/ws/sessions", async (HttpContext context, WebSocketSessionNotifier not
 }).RequireAuthorization();
 
 app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+// Mobiilirakendus otsib selle abil kohtvõrgust serverit üles (vastus näitab, et see on SportClubi API).
+app.MapGet("/api/ping", () => Results.Ok(new { app = "SportClub" })).AllowAnonymous().ExcludeFromDescription();
 
 app.Run();
 

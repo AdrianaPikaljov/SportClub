@@ -54,7 +54,7 @@
             </VerticalStackLayout>
         </Border>
 
-        <RefreshView Grid.Row="3" Command="{Binding LoadCommand}" IsRefreshing="{Binding IsBusy}">
+        <RefreshView Grid.Row="3" Command="{Binding LoadCommand}" IsRefreshing="{Binding IsRefreshing}">
             <CollectionView ItemsSource="{Binding Groups}" IsGrouped="True">
                 <CollectionView.Header>
                     <!-- Hoiatus: toimunud treeningutel on märkimata osalejaid -->

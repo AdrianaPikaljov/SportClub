@@ -76,7 +76,9 @@ public class Loc : INotifyPropertyChanged
         // login
         ["login.tagline"] = "Broneeri trenn paari puudutusega.",
         ["login.text"] = "Vaata tunniplaani, broneeri koht ja saa teade, kui ootejärjekorras koht vabaneb.",
-        ["login.server"] = "Serveri aadress (arvuti IP, vt start.bat)", ["login.email"] = "E-post", ["login.password"] = "Parool", ["login.submit"] = "Logi sisse",
+        ["login.server"] = "Serveri aadress", ["server.find"] = "Otsi",
+        ["server.searching"] = "Otsin serverit kohtvõrgust…", ["server.found"] = "Server leitud.",
+        ["server.notFound"] = "Serverit ei leitud. Kas API töötab ja telefon on samas WiFi-s? Sisesta arvuti IP käsitsi.", ["login.email"] = "E-post", ["login.password"] = "Parool", ["login.submit"] = "Logi sisse",
         ["login.register"] = "Pole kontot? Registreeru", ["login.badEmail"] = "Sisesta korrektne e-posti aadress.",
         ["login.noPassword"] = "Sisesta parool.", ["login.adminOnly"] = "Mobiilirakendus on klientidele ja treeneritele. Admin kasutab veebiliidest.",
         // registreerimine
@@ -160,7 +162,9 @@ public class Loc : INotifyPropertyChanged
         ["minutes"] = "{0} min",
         ["login.tagline"] = "Book a workout in a few taps.",
         ["login.text"] = "See the schedule, book a spot and get notified when a waitlist spot opens up.",
-        ["login.server"] = "Server address (PC IP, see start.bat)", ["login.email"] = "E-mail", ["login.password"] = "Password", ["login.submit"] = "Log in",
+        ["login.server"] = "Server address", ["server.find"] = "Find",
+        ["server.searching"] = "Searching for the server on the local network…", ["server.found"] = "Server found.",
+        ["server.notFound"] = "Server not found. Is the API running and the phone on the same Wi-Fi? Enter the computer's IP manually.", ["login.email"] = "E-mail", ["login.password"] = "Password", ["login.submit"] = "Log in",
         ["login.register"] = "No account? Sign up", ["login.badEmail"] = "Enter a valid e-mail address.",
         ["login.noPassword"] = "Enter your password.", ["login.adminOnly"] = "The mobile app is for clients and trainers. Admins use the web UI.",
         ["register.title"] = "Create account", ["register.text"] = "After signing up you can buy a monthly pass and book trainings.",

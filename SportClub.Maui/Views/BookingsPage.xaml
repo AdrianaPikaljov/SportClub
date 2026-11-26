@@ -26,7 +26,7 @@
             <Label Text="{loc:T bookings.reminder}" FontSize="13" TextColor="{StaticResource OnAccent}" />
         </Border>
 
-        <RefreshView Grid.Row="3" Command="{Binding LoadCommand}" IsRefreshing="{Binding IsBusy}">
+        <RefreshView Grid.Row="3" Command="{Binding LoadCommand}" IsRefreshing="{Binding IsRefreshing}">
             <Grid>
                 <!-- Upcoming -->
                 <CollectionView ItemsSource="{Binding Upcoming}" IsVisible="{Binding ShowUpcoming}">

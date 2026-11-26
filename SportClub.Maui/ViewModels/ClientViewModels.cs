@@ -24,7 +24,47 @@ public partial class LoginViewModel : BaseViewModel
 
     /// <summary>Serveri aadress – näidatakse ainult telefonis (iPhone/Android).</summary>
     [ObservableProperty] private string serverUrl = ApiConfig.BaseUrl;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasServerStatus))]
+    private string serverStatus = "";
+    [ObservableProperty] private bool isSearching;
+    /// <summary>Käsitsi sisestamise väli – näidatakse ainult siis, kui automaatne otsing serverit ei leidnud.</summary>
+    [ObservableProperty] private bool showManualServer;
     public bool ShowServer => ApiConfig.IsPhone;
+    public bool HasServerStatus => ShowServer && !string.IsNullOrEmpty(ServerStatus);
+
+    /// <summary>
+    /// Telefonis: kui salvestatud aadress ei vasta, otsitakse server kohtvõrgust ise üles.
+    /// Kutsutakse lehe avamisel ja nupust "Otsi".
+    /// </summary>
+    [RelayCommand]
+    public async Task FindServerAsync()
+    {
+        if (!ShowServer || IsSearching) return;
+        IsSearching = true;
+        ServerStatus = Loc.T("server.searching");
+        try
+        {
+            if (!await ServerDiscovery.IsServerAsync(ApiConfig.BaseUrl))
+            {
+                var found = await ServerDiscovery.FindAsync();
+                if (found is null)
+                {
+                    ServerStatus = Loc.T("server.notFound");
+                    ShowManualServer = true;
+                    return;
+                }
+                ApiConfig.SetBaseUrl(found);
+            }
+            ServerUrl = ApiConfig.BaseUrl;
+            ServerStatus = ""; // leitud – midagi pole vaja näidata
+            ShowManualServer = false;
+        }
+        finally
+        {
+            IsSearching = false;
+        }
+    }
 
     [RelayCommand]
     private Task LoginAsync() => RunAsync(async () =>
@@ -43,7 +83,10 @@ public partial class LoginViewModel : BaseViewModel
 
         if (ShowServer)
         {
-            ApiConfig.SetBaseUrl(ServerUrl);
+            if (ShowManualServer)
+                ApiConfig.SetBaseUrl(ServerUrl);
+            else if (!await ServerDiscovery.IsServerAsync(ApiConfig.BaseUrl))
+                await FindServerAsync(); // server võis vahepeal teise aadressi saada
             ServerUrl = ApiConfig.BaseUrl;
         }
 
@@ -62,7 +105,7 @@ public partial class LoginViewModel : BaseViewModel
     [RelayCommand]
     private Task GoToRegisterAsync()
     {
-        if (ShowServer) ApiConfig.SetBaseUrl(ServerUrl); // registreerimine kasutab sama serverit
+        if (ShowManualServer) ApiConfig.SetBaseUrl(ServerUrl); // registreerimine kasutab sama serverit
         return Shell.Current.GoToAsync("register");
     }
 }

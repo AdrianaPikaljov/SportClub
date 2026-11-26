@@ -45,7 +45,7 @@
                     Style="{StaticResource AccentButton}" HeightRequest="48" FontSize="15" />
         </VerticalStackLayout>
 
-        <RefreshView Grid.Row="3" Command="{Binding LoadCommand}" IsRefreshing="{Binding IsBusy}">
+        <RefreshView Grid.Row="3" Command="{Binding LoadCommand}" IsRefreshing="{Binding IsRefreshing}">
             <CollectionView ItemsSource="{Binding Participants}">
                 <CollectionView.EmptyView>
                     <Label Text="{loc:T att.empty}" TextColor="{DynamicResource Muted}" HorizontalTextAlignment="Center" Margin="0,30" />

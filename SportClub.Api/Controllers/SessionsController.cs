@@ -64,7 +64,7 @@ public class SessionsController : ControllerBase
     /// <response code="201">Registreeritud.</response>
     /// <response code="400">Treening on möödas, kuukaart puudub või külastused on otsas.</response>
     /// <response code="404">Treeningut ei leitud.</response>
-    /// <response code="409">Treening on täis (lisati ootejärjekorda) või oled juba registreerunud / järjekorras.</response>
+    /// <response code="409">Treening on täis (lisati ootejärjekorda), oled juba registreerunud / järjekorras või sul on 3 tunni piires teine treening.</response>
     [HttpPost("{id:int}/bookings")]
     [Authorize(Roles = Roles.Client)]
     [Tags(ApiTags.Client)]
@@ -100,7 +100,7 @@ public class SessionsController : ControllerBase
     /// <response code="201">Lisatud järjekorda.</response>
     /// <response code="400">Treening on möödas või kuukaart puudub.</response>
     /// <response code="404">Treeningut ei leitud.</response>
-    /// <response code="409">Kohti on veel (broneeri otse) või oled juba registreerunud / järjekorras.</response>
+    /// <response code="409">Kohti on veel (broneeri otse), oled juba registreerunud / järjekorras või sul on 3 tunni piires teine treening.</response>
     [HttpPost("{id:int}/waitlist")]
     [Authorize(Roles = Roles.Client)]
     [Tags(ApiTags.Client)]

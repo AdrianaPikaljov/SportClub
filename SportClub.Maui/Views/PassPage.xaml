@@ -9,7 +9,7 @@
              Shell.NavBarIsVisible="False"
              BackgroundColor="{DynamicResource Ground}">
 
-    <RefreshView Command="{Binding LoadCommand}" IsRefreshing="{Binding IsBusy}">
+    <RefreshView Command="{Binding LoadCommand}" IsRefreshing="{Binding IsRefreshing}">
         <ScrollView>
             <VerticalStackLayout Padding="20,40,20,24" Spacing="14">
                 <Label Text="{loc:T pass.title}" Style="{StaticResource PageTitle}" />

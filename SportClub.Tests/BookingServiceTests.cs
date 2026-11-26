@@ -158,4 +158,30 @@ public class BookingServiceTests
 
         await Assert.ThrowsAsync<ForbiddenException>(() => CreateService().CancelAsync(9, _client));
     }
+
+    [Fact]
+    public async Task Book_WhenOtherSessionWithin3Hours_ThrowsConflict()
+    {
+        SetBookedCount(0);
+        var other = new Session { Id = 11, StartsAt = _session.StartsAt.AddHours(2), TrainingType = new TrainingType { Name = "Jooga" } };
+        _bookings.Setup(r => r.GetAllForUserAsync(5, It.IsAny<CancellationToken>()))
+                 .ReturnsAsync(new List<Booking> { new() { Id = 1, SessionId = 11, Session = other, UserId = 5, Status = BookingStatus.Booked } });
+
+        var ex = await Assert.ThrowsAsync<ConflictException>(() => CreateService().BookAsync(10, _client));
+        Assert.Contains("3 tundi", ex.Message);
+        _bookings.Verify(r => r.AddAsync(It.IsAny<Booking>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Book_WhenOtherSessionIs3HoursApart_Succeeds()
+    {
+        SetBookedCount(0);
+        var other = new Session { Id = 11, StartsAt = _session.StartsAt.AddHours(-3), TrainingType = new TrainingType { Name = "Jooga" } };
+        _bookings.Setup(r => r.GetAllForUserAsync(5, It.IsAny<CancellationToken>()))
+                 .ReturnsAsync(new List<Booking> { new() { Id = 1, SessionId = 11, Session = other, UserId = 5, Status = BookingStatus.Booked } });
+
+        var result = await CreateService().BookAsync(10, _client);
+
+        Assert.Equal("Booked", result.Status);
+    }
 }

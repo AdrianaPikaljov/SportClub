@@ -23,13 +23,16 @@ public interface IBookingService
 /// - broneerimiseks on vaja kehtivat kuukaarti, millel on külastusi alles;
 /// - broneering võtab kuukaardilt 1 külastuse, tühistamine annab selle tagasi;
 /// - tühistada saab kuni 2 tundi enne algust (admin alati);
-/// - täis treeningu korral läheb klient ootejärjekorda, külastust siis veel ei võeta.
+/// - täis treeningu korral läheb klient ootejärjekorda, külastust siis veel ei võeta;
+/// - kliendi treeningute algusaegade vahe peab olema vähemalt 3 tundi (sama aja peale ei saa registreeruda).
 /// </summary>
 public class BookingService : IBookingService
 {
     public const int CancelHoursBefore = 2;
     public const int WaitlistClosesMinutesBefore = 60;
     public const int AdminPageSize = 20;
+    /// <summary>Mitu tundi peab olema kliendi kahe treeningu algusaegade vahel.</summary>
+    public const int MinHoursBetweenBookings = 3;
 
     private readonly ISessionRepository _sessions;
     private readonly IBookingRepository _bookings;
@@ -103,10 +106,33 @@ public class BookingService : IBookingService
                 ? new ConflictException("Oled sellele treeningule juba registreerunud.", "Juba registreeritud")
                 : new ConflictException("Oled selle treeningu ootejärjekorras juba olemas.", "Juba järjekorras");
 
+        await CheckTimeConflictAsync(session, user, ct);
+
         var pass = await _passes.GetUsableAsync(user.Id, session.StartsAt, ct)
                    ?? throw new BusinessRuleException("Sul ei ole kehtivat kuukaarti või külastused on otsas. Osta kuukaart: POST /api/passes.",
                        "Kuukaart puudub");
         return (session, pass);
+    }
+
+    /// <summary>
+    /// Kliendil ei tohi olla teist treeningut (broneeritud või ootejärjekorras), mis algab vähem kui 3 tunni kaugusel.
+    /// Kontroll on API-s, nii et see kehtib kõigile klientidele (iPhone, Android, Windows, Swagger).
+    /// </summary>
+    private async Task CheckTimeConflictAsync(Session session, CurrentUser user, CancellationToken ct)
+    {
+        var mine = await _bookings.GetAllForUserAsync(user.Id, ct) ?? new List<Booking>();
+        var conflict = mine.FirstOrDefault(b =>
+            b.SessionId != session.Id
+            && b.Status is BookingStatus.Booked or BookingStatus.Waitlisted
+            && b.Session is not null
+            && Math.Abs((b.Session.StartsAt - session.StartsAt).TotalHours) < MinHoursBetweenBookings);
+        if (conflict?.Session is null) return;
+
+        var name = conflict.Session.TrainingType?.Name ?? "treening";
+        throw new ConflictException(
+            $"Sul on juba treening {name} {conflict.Session.StartsAt:dd.MM HH:mm}. " +
+            $"Treeningute vahel peab olema vähemalt {MinHoursBetweenBookings} tundi.",
+            "Ajaline kattuvus");
     }
 
     private async Task<(Booking Booking, int Position)> AddToWaitlistAsync(Session session, CurrentUser user, CancellationToken ct)
