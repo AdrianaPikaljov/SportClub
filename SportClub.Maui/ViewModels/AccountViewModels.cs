@@ -37,8 +37,10 @@ public partial class RegisterViewModel : BaseViewModel
         if (Password.Length < 8) { ErrorMessage = "Parool peab olema vähemalt 8 tähemärki."; return; }
         if (Password != ConfirmPassword) { ErrorMessage = "Paroolid ei kattu."; return; }
 
-        var response = await _api.RegisterAsync(FullName.Trim(), Email.Trim(), Password);
-        await _auth.SignInAsync(response);
+        // API loob konto (roll Client), seejärel logime sama e-posti ja parooliga sisse.
+        await _api.RegisterAsync(FullName.Trim(), Email.Trim(), Password);
+        var response = await _api.LoginAsync(Email.Trim(), Password);
+        await _auth.SignInAsync(response, Email.Trim());
         Password = ConfirmPassword = "";
         _realtime.Start();
 
@@ -60,8 +62,8 @@ public partial class PlanItem : ObservableObject
 
     public PassPlanDto Dto { get; }
     public string Name => Dto.Name;
-    public string Description => Dto.Description ?? "";
-    public string VisitsText => $"{Dto.Visits} külastust · {Dto.DurationDays} päeva";
+    public string Description => $"Kehtib {Dto.Days} päeva ostupäevast.";
+    public string VisitsText => $"{Dto.Visits} külastust · {Dto.Days} päeva";
     public string PriceText => Dto.Price.ToString("0.00", Et) + " €";
     public string PerVisitText => $"{(Dto.Price / Dto.Visits).ToString("0.00", Et)} € / treening";
 
@@ -97,17 +99,20 @@ public partial class BuyPassViewModel : BaseViewModel
     {
         var plans = await _api.GetPassPlansAsync();
         Plans.Clear();
-        foreach (var p in plans.Items) Plans.Add(new PlanItem(p));
+        foreach (var p in plans) Plans.Add(new PlanItem(p));
 
-        // Pre-select the most popular (12 visits) or the first plan.
+        // Vaikimisi valitud: 12 külastust või esimene tariif.
         Select(Plans.FirstOrDefault(p => p.Dto.Visits == 12) ?? Plans.FirstOrDefault());
 
-        var passes = await _api.GetMyPassesAsync();
-        var current = passes.Where(p => p.IsActive).OrderByDescending(p => p.ValidUntil).FirstOrDefault();
+        // Korraga saab olla ainult üks aktiivne kuukaart.
+        var current = await _api.GetMyPassAsync();
         StartInfo = current is null
             ? "Kuukaart hakkab kehtima kohe pärast ostu."
-            : $"Sul on kehtiv kuukaart ({current.VisitsLeft} külastust alles). Uus hakkab kehtima {current.ValidUntil.ToLocalTime():dd.MM.yyyy}.";
+            : $"Sul on juba kehtiv kuukaart ({current.VisitsLeft} külastust alles, kuni {current.Until:dd.MM.yyyy}). Uue saad osta, kui see on läbi.";
     });
+
+    [RelayCommand]
+    private Task BackAsync() => Shell.Current.GoToAsync("..");
 
     [RelayCommand]
     private void Select(PlanItem? plan)
@@ -130,9 +135,8 @@ public partial class BuyPassViewModel : BaseViewModel
 
         await RunAsync(async () =>
         {
-            var pass = await _api.PurchasePassAsync(plan.Dto.Id);
-            var when = pass.IsUpcoming ? $"Kehtib alates {pass.ValidFrom.ToLocalTime():dd.MM.yyyy}." : "Saad kohe treeninguid broneerida!";
-            await ToastAsync("Kuukaart ostetud", $"{plan.Name}: {pass.VisitsTotal} külastust. {when}");
+            var pass = await _api.BuyPassAsync(plan.Dto.Id);
+            await ToastAsync("Kuukaart ostetud", $"{plan.Name}: {pass.VisitsTotal} külastust, kehtib kuni {pass.Until:dd.MM.yyyy}. Saad kohe treeninguid broneerida!");
             await Shell.Current.GoToAsync("..");
         });
     }

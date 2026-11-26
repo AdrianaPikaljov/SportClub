@@ -8,8 +8,15 @@ namespace SportClub.Maui.Services;
 /// <summary>Error returned by the API as ProblemDetails.</summary>
 public class ApiException : Exception
 {
-    public ApiException(int status, string message) : base(message) => Status = status;
+    public ApiException(int status, string message, int? position = null) : base(message)
+    {
+        Status = status;
+        Position = position;
+    }
+
     public int Status { get; }
+    /// <summary>Koht ootejärjekorras (409 vastusest, kui treening oli täis).</summary>
+    public int? Position { get; }
 }
 
 /// <summary>All calls to the Web API. The app never touches the database directly.</summary>
@@ -26,62 +33,74 @@ public class ApiClient
         _http = new HttpClient { BaseAddress = new Uri(ApiConfig.BaseUrl), Timeout = TimeSpan.FromSeconds(20) };
     }
 
-    // ----- auth -----
-    public Task<AuthResponse> LoginAsync(string email, string password) =>
-        SendAsync<AuthResponse>(HttpMethod.Post, "api/auth/login", new { email, password }, auth: false);
+    // ----- sisselogimine -----
+    public Task<LoginResponse> LoginAsync(string email, string password) =>
+        SendAsync<LoginResponse>(HttpMethod.Post, "api/auth/login", new { email, password }, auth: false);
 
-    public Task<AuthResponse> RegisterAsync(string fullName, string email, string password) =>
-        SendAsync<AuthResponse>(HttpMethod.Post, "api/auth/register", new { fullName, email, password }, auth: false);
+    public Task<UserDto> RegisterAsync(string name, string email, string password) =>
+        SendAsync<UserDto>(HttpMethod.Post, "api/auth/register", new { name, email, password }, auth: false);
 
-    // ----- client -----
-    public Task<PagedResult<PassPlanDto>> GetPassPlansAsync() =>
-        SendAsync<PagedResult<PassPlanDto>>(HttpMethod.Get, "api/pass-plans?pageSize=50", auth: false);
+    // ----- tunniplaan (külaline) -----
+    /// <summary>Treeningud päevade kaupa: from ja to on kaasa arvatud. type = tüübi nimi.</summary>
+    public Task<List<SessionDto>> GetSessionsAsync(DateTime from, DateTime to, string? type) =>
+        SendAsync<List<SessionDto>>(HttpMethod.Get,
+            $"api/sessions?from={ApiTime.Date(from)}&to={ApiTime.Date(to)}{(type is null ? "" : $"&type={Uri.EscapeDataString(type)}")}",
+            auth: false);
 
-    public Task<MonthlyPassDto> PurchasePassAsync(int planId) =>
-        SendAsync<MonthlyPassDto>(HttpMethod.Post, "api/passes/purchase", new { planId });
+    public Task<List<TrainingTypeDto>> GetTrainingTypesAsync() =>
+        SendAsync<List<TrainingTypeDto>>(HttpMethod.Get, "api/types", auth: false);
 
-    public Task<PagedResult<SessionDto>> GetSessionsAsync(DateTime fromUtc, DateTime toUtc, int? typeId) =>
-        SendAsync<PagedResult<SessionDto>>(HttpMethod.Get,
-            $"api/sessions?from={Uri.EscapeDataString(fromUtc.ToString("O"))}&to={Uri.EscapeDataString(toUtc.ToString("O"))}" +
-            $"{(typeId is null ? "" : $"&type={typeId}")}&pageSize=100");
+    public Task<List<PassPlanDto>> GetPassPlansAsync() =>
+        SendAsync<List<PassPlanDto>>(HttpMethod.Get, "api/pass-plans", auth: false);
 
-    public Task<SessionDto> GetSessionAsync(int id) => SendAsync<SessionDto>(HttpMethod.Get, $"api/sessions/{id}");
+    // ----- klient -----
+    /// <summary>Kehtiv kuukaart või null, kui seda pole (API vastab 404).</summary>
+    public async Task<MonthlyPassDto?> GetMyPassAsync()
+    {
+        try
+        {
+            return await SendAsync<MonthlyPassDto>(HttpMethod.Get, "api/passes/my");
+        }
+        catch (ApiException ex) when (ex.Status == 404)
+        {
+            return null;
+        }
+    }
 
-    public Task<PagedResult<TrainingTypeDto>> GetTrainingTypesAsync() =>
-        SendAsync<PagedResult<TrainingTypeDto>>(HttpMethod.Get, "api/training-types?pageSize=100", auth: false);
+    public Task<MonthlyPassDto> BuyPassAsync(int planId) =>
+        SendAsync<MonthlyPassDto>(HttpMethod.Post, "api/passes", new { planId });
 
-    public Task<BookingDto> BookAsync(int sessionId) => SendAsync<BookingDto>(HttpMethod.Post, $"api/sessions/{sessionId}/bookings");
+    /// <summary>Registreerumine. Täis treeningul vastab API 409 ja paneb kliendi ootejärjekorda.</summary>
+    public async Task<BookResult> BookAsync(int sessionId)
+    {
+        try
+        {
+            await SendAsync<BookingDto>(HttpMethod.Post, $"api/sessions/{sessionId}/bookings");
+            return new BookResult(false, null);
+        }
+        catch (ApiException ex) when (ex.Status == 409 && ex.Position is not null)
+        {
+            return new BookResult(true, ex.Position);
+        }
+    }
 
-    public Task<WaitlistEntryDto> JoinWaitlistAsync(int sessionId) =>
-        SendAsync<WaitlistEntryDto>(HttpMethod.Post, $"api/sessions/{sessionId}/waitlist");
+    public Task<List<BookingDto>> GetMyBookingsAsync() => SendAsync<List<BookingDto>>(HttpMethod.Get, "api/bookings/my");
 
-    public Task<List<BookingDto>> GetMyBookingsAsync(bool upcoming) =>
-        SendAsync<List<BookingDto>>(HttpMethod.Get, $"api/bookings/my?upcoming={upcoming.ToString().ToLowerInvariant()}");
-
+    /// <summary>Tühistab broneeringu või eemaldab ootejärjekorrast.</summary>
     public Task CancelBookingAsync(int bookingId) => SendAsync<object>(HttpMethod.Delete, $"api/bookings/{bookingId}");
 
-    public Task<List<WaitlistEntryDto>> GetMyWaitlistAsync() => SendAsync<List<WaitlistEntryDto>>(HttpMethod.Get, "api/waitlist/my");
+    // ----- treener -----
+    public Task<List<TrainerSessionDto>> GetMyTrainerSessionsAsync() =>
+        SendAsync<List<TrainerSessionDto>>(HttpMethod.Get, "api/trainer/sessions");
 
-    public Task LeaveWaitlistAsync(int entryId) => SendAsync<object>(HttpMethod.Delete, $"api/waitlist/{entryId}");
-
-    public Task<List<MonthlyPassDto>> GetMyPassesAsync() => SendAsync<List<MonthlyPassDto>>(HttpMethod.Get, "api/passes/my");
-
-    public Task<List<NotificationDto>> GetMyNotificationsAsync() => SendAsync<List<NotificationDto>>(HttpMethod.Get, "api/notifications/my");
-
-    // ----- trainer -----
-    public Task<PagedResult<SessionDto>> GetMyTrainerSessionsAsync() =>
-        SendAsync<PagedResult<SessionDto>>(HttpMethod.Get,
-            $"api/sessions/mine?from={Uri.EscapeDataString(DateTime.UtcNow.AddHours(-3).ToString("O"))}&pageSize=50");
-
-    public Task<List<ParticipantDto>> GetParticipantsAsync(int sessionId) =>
-        SendAsync<List<ParticipantDto>>(HttpMethod.Get, $"api/sessions/{sessionId}/participants");
+    public Task<List<AttendanceItemDto>> GetAttendanceAsync(int sessionId) =>
+        SendAsync<List<AttendanceItemDto>>(HttpMethod.Get, $"api/sessions/{sessionId}/attendance");
 
     public Task SetAttendanceAsync(int bookingId, bool attended) =>
         SendAsync<object>(HttpMethod.Patch, $"api/bookings/{bookingId}/attendance", new { attended });
 
-    public Task<List<PopularTrainingDto>> GetPopularAsync(DateTime? fromUtc) =>
-        SendAsync<List<PopularTrainingDto>>(HttpMethod.Get,
-            $"api/stats/popular?top=10{(fromUtc is null ? "" : $"&from={Uri.EscapeDataString(fromUtc.Value.ToString("O"))}")}");
+    public Task<List<PopularDto>> GetPopularAsync(DateTime? from) =>
+        SendAsync<List<PopularDto>>(HttpMethod.Get, $"api/stats/popular{(from is null ? "" : $"?from={ApiTime.Date(from.Value)}")}");
 
     // ----- plumbing -----
     private async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null, bool auth = true)
@@ -119,7 +138,7 @@ public class ApiClient
                           ?? (problem?.Errors is { Count: > 0 } ? string.Join(" ", problem.Errors.Values.SelectMany(v => v)) : null)
                           ?? problem?.Title
                           ?? $"Viga {(int)response.StatusCode}";
-            throw new ApiException((int)response.StatusCode, message);
+            throw new ApiException((int)response.StatusCode, message, problem?.Position);
         }
     }
 }

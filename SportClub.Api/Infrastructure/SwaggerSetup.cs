@@ -6,28 +6,25 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 
 namespace SportClub.Api.Infrastructure;
 
-/// <summary>Swagger groups in the order they are shown, with a short explanation for each.</summary>
+/// <summary>Swaggeri grupid (rollide kaupa) selles järjekorras, nagu neid näidatakse.</summary>
 public static class ApiTags
 {
-    public const string Auth = "1. Sisselogimine";
-    public const string Schedule = "2. Tunniplaan";
-    public const string Booking = "3. Broneerimine";
-    public const string Waitlist = "4. Ootejärjekord";
-    public const string Passes = "5. Kuukaardid";
-    public const string Trainer = "6. Treener";
-    public const string Admin = "7. Admin – haldus";
-    public const string Worker = "8. Taustateenus (Worker)";
+    public const string Auth = "1. Registreerimine ja sisselogimine";
+    public const string Guest = "2. Külaline – tunniplaan, treenerid, tüübid, tariifid";
+    public const string Client = "3. Klient – kuukaart ja broneeringud";
+    public const string Trainer = "4. Treener – treeningud, kohalolu, statistika";
+    public const string Admin = "5. Admin – haldus";
+    public const string Worker = "6. Taustateenus (Worker)";
 
     public static readonly (string Name, string Description)[] All =
     {
         (Auth, "Alusta siit: logi sisse, kopeeri vastusest **token** ja vajuta üleval **Authorize**."),
-        (Schedule, "Treeningute tunniplaan. Vaatamiseks ei pea sisse logima."),
-        (Booking, "Klient broneerib koha, vaatab oma broneeringuid ja tühistab. Täis treening → **409**."),
-        (Waitlist, "Täis treeningu ootejärjekord. Kui koht vabaneb, viib Worker järjekorras esimese treeningule."),
-        (Passes, "Kuukaardi paketid ja ostmine. Iga broneering kasutab ühe külastuse."),
-        (Trainer, "Treeneri vaade: oma treeningud, osalejad, kohalolu ja statistika."),
-        (Admin, "Klubi haldus: treenerid, treeningutüübid, tunniplaan, paketid, kuukaardid ja kasutajad."),
-        (Worker, "Need otspunktid kutsub välja eraldi Worker-programm rolliga **Service**.")
+        (Guest, "Vaatamiseks ei pea sisse logima. Peaaegu kõikjal piisab: *Try it out* → *Execute*."),
+        (Client, "Kuukaardi ost, registreerimine treeningule (täis treeningul automaatselt ootejärjekorda), tühistamine."),
+        (Trainer, "Oma treeningud, osalejate nimekiri ja kohalolu märkimine, statistika oma treeningute kohta."),
+        (Admin, "Treenerid, tüübid, tunniplaan, tariifid, kõik broneeringud, kuukaardid ja kasutajad. " +
+                "Muutmiseks: GET {id} → kopeeri vastus PUT-i → muuda → Execute."),
+        (Worker, "Neid kutsub eraldi Worker-programm rolliga **Service** (service@sportclub.ee).")
     };
 }
 
@@ -76,6 +73,29 @@ public class RoleInfoOperationFilter : IOperationFilter
     private static string Prepend(string line, string? text) => string.IsNullOrWhiteSpace(text) ? line : $"{line}\n\n{text}";
 }
 
+/// <summary>
+/// Teeb parameetrist "type" (GET /api/sessions) rippmenüü treeningutüüpide nimedega andmebaasist.
+/// Swagger ehitab dokumendi igal laadimisel uuesti, nii et uus tüüp ilmub menüüsse kohe.
+/// </summary>
+public class DropdownOperationFilter : IOperationFilter
+{
+    private readonly IServiceScopeFactory _scopes;
+
+    public DropdownOperationFilter(IServiceScopeFactory scopes) => _scopes = scopes;
+
+    public void Apply(OpenApiOperation operation, OperationFilterContext context)
+    {
+        if (context.ApiDescription.HttpMethod != "GET" || context.ApiDescription.RelativePath != "api/sessions") return;
+        var parameter = operation.Parameters?.FirstOrDefault(p => p.Name == "type");
+        if (parameter?.Schema is null) return;
+
+        using var scope = _scopes.CreateScope();
+        var types = scope.ServiceProvider.GetRequiredService<SportClub.Core.Services.ITrainingTypeService>()
+            .GetAllAsync().GetAwaiter().GetResult();
+        parameter.Schema.Enum = types.Select(t => (IOpenApiAny)new OpenApiString(t.Name)).ToList();
+    }
+}
+
 /// <summary>Puts the groups in a fixed order and adds their descriptions.</summary>
 public class TagOrderDocumentFilter : IDocumentFilter
 {
@@ -97,12 +117,14 @@ public static class SwaggerSetup
                 Spordiklubi grupitreeningute tunniplaan ja broneerimine.
 
                 **Kuidas proovida:**
-                1. Ava **1. Sisselogimine → POST /api/auth/login**, vajuta *Try it out* ja *Execute* (näidisandmed on juba täidetud).
+                1. Ava **1. Registreerimine ja sisselogimine → POST /api/auth/login**, vajuta *Try it out* ja *Execute* (näidisandmed on juba täidetud).
                 2. Kopeeri vastusest `token`.
                 3. Vajuta paremal üleval **Authorize**, kleebi token ja vajuta *Authorize*.
                 4. Nüüd töötavad ka lukuga otspunktid.
 
-                **Testkontod:** klient@sportclub.ee / Klient123! · treener@sportclub.ee / Treener123! · admin@sportclub.ee / Admin123! · worker@sportclub.ee / Worker123!
+                **Testkontod:** klient@sportclub.ee / Klient123! · treener@sportclub.ee / Treener123! · admin@sportclub.ee / Admin123! · service@sportclub.ee / Service123!
+
+                Kuupäevad on kujul **2026-11-27**, kellaajad Eesti aja järgi (**2026-11-27 18:00**).
 
                 **Vastuse koodid:** 200 OK · 201 loodud · 204 tehtud (sisu pole) · 400 vigased andmed · 401 pole sisse logitud · 403 pole õigust · 404 ei leitud · 409 konflikt (nt treening on täis).
                 Vead tulevad alati ühesuguse ProblemDetails kujul: `status`, `title`, `detail`.
@@ -130,9 +152,6 @@ public static class SwaggerSetup
             return $"{order.GetValueOrDefault(tag, 99):D2}_{api.RelativePath}_{m}";
         });
 
-        // Show TimeSpan-free, readable examples for DateTime query params.
-        c.MapType<DateTime>(() => new OpenApiSchema { Type = "string", Format = "date-time", Example = new OpenApiString("2026-11-16T00:00:00Z") });
-
         foreach (var xml in new[] { Assembly.GetExecutingAssembly().GetName().Name, "SportClub.Core" })
         {
             var path = Path.Combine(AppContext.BaseDirectory, $"{xml}.xml");
@@ -141,6 +160,7 @@ public static class SwaggerSetup
 
         // Registered after the XML comments so the role line is added on top of the remarks, not overwritten by them.
         c.OperationFilter<RoleInfoOperationFilter>();
+        c.OperationFilter<DropdownOperationFilter>();
         c.DocumentFilter<TagOrderDocumentFilter>();
     }
 }

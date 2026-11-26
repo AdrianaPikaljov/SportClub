@@ -4,6 +4,7 @@ using SportClub.Core.Interfaces;
 
 namespace SportClub.Infrastructure.Data;
 
+/// <summary>EF Core andmebaas. Ainult Web API pöördub selle poole.</summary>
 public class AppDbContext : DbContext, IUnitOfWork
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
@@ -13,9 +14,8 @@ public class AppDbContext : DbContext, IUnitOfWork
     public DbSet<TrainingType> TrainingTypes => Set<TrainingType>();
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<Booking> Bookings => Set<Booking>();
-    public DbSet<WaitlistEntry> WaitlistEntries => Set<WaitlistEntry>();
-    public DbSet<MonthlyPass> MonthlyPasses => Set<MonthlyPass>();
     public DbSet<PassPlan> PassPlans => Set<PassPlan>();
+    public DbSet<MonthlyPass> MonthlyPasses => Set<MonthlyPass>();
     public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder b)
@@ -31,7 +31,8 @@ public class AppDbContext : DbContext, IUnitOfWork
         b.Entity<Trainer>(e =>
         {
             e.Property(x => x.FullName).HasMaxLength(100).IsRequired();
-            e.Property(x => x.Bio).HasMaxLength(1000);
+            e.Property(x => x.Specialty).HasMaxLength(60).IsRequired();
+            e.Property(x => x.Description).HasMaxLength(1000);
             e.Property(x => x.Phone).HasMaxLength(30);
             e.HasOne(x => x.User).WithOne(u => u.Trainer).HasForeignKey<Trainer>(x => x.UserId).OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(x => x.UserId).IsUnique();
@@ -42,12 +43,10 @@ public class AppDbContext : DbContext, IUnitOfWork
             e.Property(x => x.Name).HasMaxLength(60).IsRequired();
             e.HasIndex(x => x.Name).IsUnique();
             e.Property(x => x.Description).HasMaxLength(1000);
-            e.Property(x => x.Intensity).HasMaxLength(20);
         });
 
         b.Entity<Session>(e =>
         {
-            e.Property(x => x.Room).HasMaxLength(50).IsRequired();
             e.HasOne(x => x.TrainingType).WithMany(t => t.Sessions).HasForeignKey(x => x.TrainingTypeId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Trainer).WithMany(t => t.Sessions).HasForeignKey(x => x.TrainerId).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => x.StartsAt);
@@ -58,28 +57,24 @@ public class AppDbContext : DbContext, IUnitOfWork
             e.HasOne(x => x.Session).WithMany(s => s.Bookings).HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.User).WithMany(u => u.Bookings).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.MonthlyPass).WithMany().HasForeignKey(x => x.MonthlyPassId).OnDelete(DeleteBehavior.SetNull);
-            e.HasIndex(x => new { x.SessionId, x.Status });
-        });
-
-        b.Entity<WaitlistEntry>(e =>
-        {
-            e.HasOne(x => x.Session).WithMany(s => s.WaitlistEntries).HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Cascade);
-            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            // Üks inimene saab ühel treeningul olla ainult üks kord (kas broneeringu või järjekorra kohaga).
             e.HasIndex(x => new { x.SessionId, x.UserId }).IsUnique();
+            e.HasIndex(x => new { x.SessionId, x.Status });
         });
 
         b.Entity<PassPlan>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(60).IsRequired();
-            e.Property(x => x.Description).HasMaxLength(500);
-            e.Property(x => x.Price).HasConversion<double>(); // SQLite cannot sort/compare decimal
+            e.Property(x => x.Price).HasConversion<double>(); // SQLite ei oska decimal-it sorteerida
         });
 
         b.Entity<MonthlyPass>(e =>
         {
             e.HasOne(x => x.User).WithMany(u => u.Passes).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.PassPlan).WithMany().HasForeignKey(x => x.PassPlanId).OnDelete(DeleteBehavior.SetNull);
-            e.Property(x => x.PricePaid).HasConversion<double?>();
+            e.Property(x => x.PlanName).HasMaxLength(60);
+            e.Property(x => x.PricePaid).HasConversion<double>();
             e.Ignore(x => x.VisitsLeft);
         });
 

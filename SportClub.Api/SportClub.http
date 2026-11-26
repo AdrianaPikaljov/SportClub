@@ -1,247 +1,246 @@
-# SportClub API – test requests (Visual Studio / Rider / VS Code REST Client)
-# 1) Run the API (http://localhost:5080)
-# 2) Run a login request below and copy the "token" into the matching variable.
+# SportClub API – testpäringud (Visual Studio / Rider / VS Code REST Client)
+# 1) Käivita API (http://localhost:5080)
+# 2) Käivita allpool sisselogimine ja kopeeri vastusest "token" sobivasse muutujasse.
 
 @host = http://localhost:5080
 @clientToken = PASTE_CLIENT_TOKEN
-@adminToken = PASTE_ADMIN_TOKEN
 @trainerToken = PASTE_TRAINER_TOKEN
+@adminToken = PASTE_ADMIN_TOKEN
 @serviceToken = PASTE_SERVICE_TOKEN
 
-### ---------- Auth ----------
+### ================= 1. Registreerimine ja sisselogimine =================
 
-### Login as client
+### Registreeri klient → 201 (vigased andmed → 400, e-post olemas → 409)
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{ "name": "Anna Kask", "email": "anna.kask@mail.ee", "password": "Parool123" }
+
+### Registreerimine: liiga lühike parool → 400
+POST {{host}}/api/auth/register
+Content-Type: application/json
+
+{ "name": "Test", "email": "test@mail.ee", "password": "123" }
+
+### Login klient
 POST {{host}}/api/auth/login
 Content-Type: application/json
 
 { "email": "klient@sportclub.ee", "password": "Klient123!" }
 
-### Login as admin
-POST {{host}}/api/auth/login
-Content-Type: application/json
-
-{ "email": "admin@sportclub.ee", "password": "Admin123!" }
-
-### Login as trainer
+### Login treener (Martin Kask)
 POST {{host}}/api/auth/login
 Content-Type: application/json
 
 { "email": "treener@sportclub.ee", "password": "Treener123!" }
 
-### Login as Service (Worker)
+### Login admin
 POST {{host}}/api/auth/login
 Content-Type: application/json
 
-{ "email": "worker@sportclub.ee", "password": "Worker123!" }
+{ "email": "admin@sportclub.ee", "password": "Admin123!" }
 
-### Wrong password → 401 ProblemDetails
+### Login Service (Worker)
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "service@sportclub.ee", "password": "Service123!" }
+
+### Vale parool → 401
 POST {{host}}/api/auth/login
 Content-Type: application/json
 
 { "email": "klient@sportclub.ee", "password": "vale" }
 
-### Register → 201 (validation errors → 400)
-POST {{host}}/api/auth/register
-Content-Type: application/json
+### ================= 2. Külaline =================
 
-{ "fullName": "Test Kasutaja", "email": "test@example.com", "password": "Parool123!" }
+### Tunniplaan – kõik
+GET {{host}}/api/sessions
 
-### Who am I
-GET {{host}}/api/auth/me
-Authorization: Bearer {{clientToken}}
+### Tunniplaan – periood ja tüüp
+GET {{host}}/api/sessions?from=2026-11-27&to=2026-11-30&type=Jooga
 
-### ---------- Timetable ----------
+### Tunniplaan – vale kuupäev → 400
+GET {{host}}/api/sessions?from=27.11.2026
 
-### Timetable (filter + paging)
-GET {{host}}/api/sessions?from=2026-11-16T00:00:00Z&to=2026-11-23T00:00:00Z&type=1&page=1&pageSize=10
+### Treenerid
+GET {{host}}/api/trainers
 
-### Search + sort
-GET {{host}}/api/sessions?search=kask&sort=-startsAt
+### Treeneri treeningud
+GET {{host}}/api/trainers/2/sessions
 
-### One session
-GET {{host}}/api/sessions/1
+### Treeningutüübid
+GET {{host}}/api/types
 
-### Not found → 404
-GET {{host}}/api/sessions/99999
-
-### Create session (Admin) → 201
-POST {{host}}/api/sessions
-Authorization: Bearer {{adminToken}}
-Content-Type: application/json
-
-{ "trainingTypeId": 1, "trainerId": 1, "startsAt": "2026-12-01T05:00:00Z", "durationMinutes": 60, "room": "Saal 2", "maxParticipants": 15 }
-
-### Create session in the past → 400
-POST {{host}}/api/sessions
-Authorization: Bearer {{adminToken}}
-Content-Type: application/json
-
-{ "trainingTypeId": 1, "trainerId": 1, "startsAt": "2020-01-01T05:00:00Z", "durationMinutes": 60, "room": "Saal 2", "maxParticipants": 15 }
-
-### Client tries Admin endpoint → 403
-POST {{host}}/api/sessions
-Authorization: Bearer {{clientToken}}
-Content-Type: application/json
-
-{ "trainingTypeId": 1, "trainerId": 1, "startsAt": "2026-12-01T05:00:00Z", "durationMinutes": 60, "room": "Saal 2", "maxParticipants": 15 }
-
-### Update session (Admin)
-PUT {{host}}/api/sessions/1
-Authorization: Bearer {{adminToken}}
-Content-Type: application/json
-
-{ "trainingTypeId": 1, "trainerId": 1, "startsAt": "2026-12-01T05:00:00Z", "durationMinutes": 60, "room": "Saal 3", "maxParticipants": 16 }
-
-### Delete session (Admin) → 204, or 409 if it has bookings
-DELETE {{host}}/api/sessions/2
-Authorization: Bearer {{adminToken}}
-
-### ---------- Booking ----------
-# Crossfit sessions (type=5) have only 3 places – easy to test "full".
-
-### Book a spot → 201, 409 if full
-POST {{host}}/api/sessions/5/bookings
-Authorization: Bearer {{clientToken}}
-
-### Join waitlist (only when full) → 201
-POST {{host}}/api/sessions/5/waitlist
-Authorization: Bearer {{clientToken}}
-
-### My bookings
-GET {{host}}/api/bookings/my
-Authorization: Bearer {{clientToken}}
-
-### Cancel booking → 204
-DELETE {{host}}/api/bookings/1
-Authorization: Bearer {{clientToken}}
-
-### My waitlist places
-GET {{host}}/api/waitlist/my
-Authorization: Bearer {{clientToken}}
-
-### Leave waitlist → 204
-DELETE {{host}}/api/waitlist/1
-Authorization: Bearer {{clientToken}}
-
-### Pass plans on sale (no login needed)
+### Kuukaardi tariifid
 GET {{host}}/api/pass-plans
 
-### Buy a monthly pass (payment simulated) → 201; 409 if a next pass is already waiting
-POST {{host}}/api/passes/purchase
-Authorization: Bearer {{clientToken}}
-Content-Type: application/json
+### Külaline ei saa broneerida → 401
+POST {{host}}/api/sessions/1/bookings
 
-{ "planId": 3 }
+### ================= 3. Klient =================
 
-### My monthly pass
+### Minu kuukaart (puudub → 404)
 GET {{host}}/api/passes/my
 Authorization: Bearer {{clientToken}}
 
-### My notifications
-GET {{host}}/api/notifications/my
+### Osta kuukaart (aktiivne on juba olemas → 409)
+POST {{host}}/api/passes
+Authorization: Bearer {{clientToken}}
+Content-Type: application/json
+
+{ "planId": 2 }
+
+### Registreeru treeningule (45 = homme 19:00 Crossfit, täis). Täis → 409 ja koht järjekorras
+POST {{host}}/api/sessions/45/bookings
 Authorization: Bearer {{clientToken}}
 
-### ---------- Trainer ----------
+### Ootejärjekorda (ülesande nõue; kohti on → 409)
+POST {{host}}/api/sessions/45/waitlist
+Authorization: Bearer {{clientToken}}
 
-### My sessions (trainer)
-GET {{host}}/api/sessions/mine
+### Minu broneeringud ja järjekorrakohad
+GET {{host}}/api/bookings/my
+Authorization: Bearer {{clientToken}}
+
+### Tühista broneering / lahku järjekorrast
+DELETE {{host}}/api/bookings/1
+Authorization: Bearer {{clientToken}}
+
+### ================= 4. Treener =================
+
+### Minu treeningud (toimunud ja tulevased, staatusega)
+GET {{host}}/api/trainer/sessions
 Authorization: Bearer {{trainerToken}}
 
-### Participants of a session
-GET {{host}}/api/sessions/5/participants
+### Osalejate nimekiri
+GET {{host}}/api/sessions/32/attendance
 Authorization: Bearer {{trainerToken}}
 
-### Mark attendance (from 30 min before the start)
+### Märgi kohalolu kõigile korraga (bookingId-d võta eelmisest vastusest)
+PATCH {{host}}/api/sessions/32/attendance
+Authorization: Bearer {{trainerToken}}
+Content-Type: application/json
+
+[
+  { "bookingId": 1, "name": "Mari Tamm", "attended": true },
+  { "bookingId": 2, "name": "Karl Lepp", "attended": false }
+]
+
+### Märgi ühe inimese kohalolu (ülesande nõue)
 PATCH {{host}}/api/bookings/1/attendance
 Authorization: Bearer {{trainerToken}}
 Content-Type: application/json
 
 { "attended": true }
 
-### Popular trainings
-GET {{host}}/api/stats/popular?top=5
+### Statistika (treener – ainult oma treeningud)
+GET {{host}}/api/stats/popular
 Authorization: Bearer {{trainerToken}}
 
-### ---------- Catalog (Admin) ----------
+### ================= 5. Admin =================
 
-### Trainers (search, sort, paging)
-GET {{host}}/api/trainers?search=saar&sort=name&page=1&pageSize=10
+### Treener muutmiseks
+GET {{host}}/api/trainers/1
 Authorization: Bearer {{adminToken}}
 
-### Create trainer
+### Lisa treener koos kontoga
 POST {{host}}/api/trainers
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
-{ "fullName": "Uus Treener", "bio": "Zumba ja tantsutreeningud", "phone": "+372 5555 9999" }
+{ "name": "Mari Tamm", "specialty": "Jooga", "description": "10 aastat kogemust",
+  "phone": "+372 5555 1234", "email": "mari@sportclub.ee", "password": "Treener123" }
 
-### Update trainer
+### Muuda treenerit
 PUT {{host}}/api/trainers/1
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
-{ "fullName": "Kertu Saar", "bio": "Joogaõpetaja", "phone": "+372 5550 0001" }
+{ "name": "Kertu Saar", "specialty": "Jooga", "description": "12 aastat kogemust, ka pilates",
+  "phone": "+372 5550 0001", "email": "kertu@sportclub.ee", "newPassword": "" }
 
-### Delete trainer → 409 if trainer has sessions
+### Kustuta treener (tulevased treeningud → 409)
 DELETE {{host}}/api/trainers/1
 Authorization: Bearer {{adminToken}}
 
-### Training types
-GET {{host}}/api/training-types?sort=-name
-
-### Create training type
-POST {{host}}/api/training-types
+### Lisa tüüp
+POST {{host}}/api/types
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
-{ "name": "Zumba", "description": "Tantsuline treening", "intensity": "Keskmine" }
+{ "name": "Zumba", "description": "Tantsuline aeroobika." }
 
-### Create pass plan (Admin)
+### Tüüp muutmiseks
+GET {{host}}/api/types/1
+Authorization: Bearer {{adminToken}}
+
+### Lisa treening
+POST {{host}}/api/sessions
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "typeId": 1, "trainerId": 1, "date": "2026-12-20", "time": "18:00", "durationMinutes": 60, "capacity": 12 }
+
+### Treening muutmiseks
+GET {{host}}/api/sessions/45
+Authorization: Bearer {{adminToken}}
+
+### Muuda treeningut (rohkem kohti → Worker viib järjekorrast inimesi)
+PUT {{host}}/api/sessions/45
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "typeId": 5, "trainerId": 2, "date": "2026-11-27", "time": "19:00", "durationMinutes": 60, "capacity": 5 }
+
+### Kustuta treening (broneeringud tühistatakse, külastused tagastatakse)
+DELETE {{host}}/api/sessions/45
+Authorization: Bearer {{adminToken}}
+
+### Lisa tariif
 POST {{host}}/api/pass-plans
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
 
-{ "name": "Kuukaart 16", "description": "4 korda nädalas", "visits": 16, "durationDays": 30, "price": 59.00, "isActive": true }
+{ "name": "Nädalakaart", "visits": 5, "days": 7, "price": 19.90 }
 
-### All plans incl. inactive (Admin)
-GET {{host}}/api/pass-plans?includeInactive=true&sort=-price
+### Eemalda tariif müügist
+DELETE {{host}}/api/pass-plans/1
 Authorization: Bearer {{adminToken}}
 
-### Delete plan → 409 if it has been bought (deactivate instead)
-DELETE {{host}}/api/pass-plans/3
+### Kõik broneeringud: otsing, filter, sorteerimine, leheküljed
+GET {{host}}/api/bookings?search=mari&status=Booked&sort=Vanimad&page=1
 Authorization: Bearer {{adminToken}}
 
-### Users (Admin)
-GET {{host}}/api/users?role=Client
+### Kõik kuukaardid
+GET {{host}}/api/passes?search=karl
 Authorization: Bearer {{adminToken}}
 
-### All passes (Admin)
-GET {{host}}/api/passes
+### Kasutajad
+GET {{host}}/api/users?search=tamm
 Authorization: Bearer {{adminToken}}
 
-### Give a monthly pass (Admin)
-POST {{host}}/api/passes
+### Statistika (admin – kogu klubi)
+GET {{host}}/api/stats/popular?from=2026-11-01
 Authorization: Bearer {{adminToken}}
-Content-Type: application/json
 
-{ "userId": 4, "validFrom": "2026-12-01T00:00:00Z", "validUntil": "2026-12-31T23:59:59Z", "visitsTotal": 12 }
+### ================= 6. Taustateenus =================
 
-### ---------- Worker endpoints (Service) ----------
-
-### Promote waitlist
+### Vii järjekorrast vabadele kohtadele (ka admin saab)
 POST {{host}}/api/waitlist/promote
 Authorization: Bearer {{serviceToken}}
 
-### Sessions starting within 60 minutes
+### Tunni jooksul algavad treeningud
 GET {{host}}/api/sessions/starting?within=60
 Authorization: Bearer {{serviceToken}}
 
-### Send reminder
+### Saada meeldetuletus (korduv → 409)
 POST {{host}}/api/notifications
 Authorization: Bearer {{serviceToken}}
 Content-Type: application/json
 
-{ "sessionId": 1 }
+{ "bookingId": 1 }
 
-### WebSocket (not testable here): ws://localhost:5080/ws/sessions?access_token={{clientToken}}
-### Message: {"sessionId":5,"free":1,"type":"FreeSpotsChanged"}
+### Klient ei saa → 403
+POST {{host}}/api/waitlist/promote
+Authorization: Bearer {{clientToken}}

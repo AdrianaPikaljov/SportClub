@@ -1,6 +1,6 @@
 namespace SportClub.Core.Exceptions;
 
-/// <summary>Base class for business errors. The API turns them into ProblemDetails.</summary>
+/// <summary>Äriloogika viga. API teeb sellest ProblemDetails vastuse.</summary>
 public abstract class AppException : Exception
 {
     protected AppException(string message, string title) : base(message) => Title = title;
@@ -8,31 +8,39 @@ public abstract class AppException : Exception
     public abstract int StatusCode { get; }
 }
 
+/// <summary>404 – ei leitud.</summary>
 public class NotFoundException : AppException
 {
     public NotFoundException(string what, object id) : base($"{what} (id {id}) ei leitud.", "Ei leitud") { }
+    public NotFoundException(string message) : base(message, "Ei leitud") { }
     public override int StatusCode => 404;
 }
 
+/// <summary>409 – konflikt (nt juba olemas).</summary>
 public class ConflictException : AppException
 {
     public ConflictException(string message, string title = "Konflikt") : base(message, title) { }
     public override int StatusCode => 409;
 }
 
-/// <summary>The session has no free spots (HTTP 409).</summary>
+/// <summary>409 – treening on täis.</summary>
 public class SessionFullException : ConflictException
 {
-    public SessionFullException(int sessionId)
-        : base($"Treening {sessionId} on täis. Võid end panna ootejärjekorda.", "Treening on täis") { }
+    public SessionFullException(int sessionId, bool waitlistClosed = false)
+        : base(waitlistClosed
+                ? $"Treening {sessionId} on täis ja algab vähem kui tunni pärast. Ootejärjekorda enam ei saa."
+                : $"Treening {sessionId} on täis.",
+            "Treening on täis") { }
 }
 
+/// <summary>400 – reegel ei luba (nt kuukaart puudub, treening on möödas).</summary>
 public class BusinessRuleException : AppException
 {
     public BusinessRuleException(string message, string title = "Vigane päring") : base(message, title) { }
     public override int StatusCode => 400;
 }
 
+/// <summary>403 – pole õigust (nt teise kliendi broneering).</summary>
 public class ForbiddenException : AppException
 {
     public ForbiddenException(string message) : base(message, "Õigused puuduvad") { }

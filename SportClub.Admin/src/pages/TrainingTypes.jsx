@@ -1,26 +1,26 @@
 import { useState } from 'react'
 import { api } from '../api.js'
-import { ErrorBox, Field, Modal, Pager, SortHeader, useDebounced, usePagedList } from '../components/ui.jsx'
+import { ErrorBox, Field, Modal, useList } from '../components/ui.jsx'
 
-const empty = { name: '', description: '', intensity: 'Keskmine' }
-const INTENSITIES = ['Madal', 'Keskmine', 'Kõrge']
+const empty = { name: '', description: '' }
 
 export default function TrainingTypes() {
-  const [searchText, setSearchText] = useState('')
-  const [sort, setSort] = useState('name')
-  const [page, setPage] = useState(1)
   const [editing, setEditing] = useState(null)
-  const search = useDebounced(searchText)
+  const { items, error, loading, reload } = useList(() => api('/api/types'), [])
 
-  const { data, error, loading, reload } = usePagedList(
-    () => api('/api/training-types', { query: { search, sort, page, pageSize: 10 } }),
-    [search, sort, page]
-  )
+  async function edit(t) {
+    try {
+      const data = await api(`/api/types/${t.id}`)
+      setEditing({ ...data, description: data.description || '', id: t.id })
+    } catch (e) {
+      window.alert(e.message)
+    }
+  }
 
   async function remove(t) {
     if (!window.confirm(`Kustutada treeningutüüp ${t.name}?`)) return
     try {
-      await api(`/api/training-types/${t.id}`, { method: 'DELETE' })
+      await api(`/api/types/${t.id}`, { method: 'DELETE' })
       reload()
     } catch (e) {
       window.alert(e.message)
@@ -33,37 +33,33 @@ export default function TrainingTypes() {
         <h1>Treeningutüübid</h1>
         <button className="btn primary" onClick={() => setEditing(empty)}>+ Lisa tüüp</button>
       </header>
-      <div className="filters">
-        <input placeholder="Otsi nime või kirjelduse järgi" value={searchText} onChange={(e) => { setSearchText(e.target.value); setPage(1) }} />
-      </div>
       <ErrorBox error={error} />
       <div className="table-wrap">
         <table className={loading ? 'loading' : ''}>
           <thead>
             <tr>
-              <SortHeader field="name" label="Nimi" sort={sort} onSort={setSort} />
-              <SortHeader field="intensity" label="Intensiivsus" sort={sort} onSort={setSort} />
+              <th>ID</th>
+              <th>Nimi</th>
               <th>Kirjeldus</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {data.items.map((t) => (
+            {items.map((t) => (
               <tr key={t.id}>
+                <td>{t.id}</td>
                 <td><strong>{t.name}</strong></td>
-                <td>{t.intensity}</td>
                 <td className="muted">{t.description || '–'}</td>
                 <td className="actions">
-                  <button className="btn ghost small" onClick={() => setEditing({ ...t, description: t.description || '' })}>Muuda</button>
+                  <button className="btn ghost small" onClick={() => edit(t)}>Muuda</button>
                   <button className="btn danger small" onClick={() => remove(t)}>Kustuta</button>
                 </td>
               </tr>
             ))}
-            {!data.items.length && !loading && <tr><td colSpan="4" className="muted center">Tüüpe ei leitud.</td></tr>}
+            {!items.length && !loading && <tr><td colSpan="4" className="muted center">Tüüpe pole.</td></tr>}
           </tbody>
         </table>
       </div>
-      <Pager page={data.page} totalPages={data.totalPages} totalCount={data.totalCount} onPage={setPage} />
       {editing && <TypeForm initial={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload() }} />}
     </section>
   )
@@ -82,10 +78,10 @@ function TypeForm({ initial, onClose, onSaved }) {
     setErrors(v)
     if (Object.keys(v).length) return
 
-    const body = { name: form.name, description: form.description || null, intensity: form.intensity }
+    const body = { name: form.name, description: form.description || null }
     try {
-      if (form.id) await api(`/api/training-types/${form.id}`, { method: 'PUT', body })
-      else await api('/api/training-types', { method: 'POST', body })
+      if (form.id) await api(`/api/types/${form.id}`, { method: 'PUT', body })
+      else await api('/api/types', { method: 'POST', body })
       onSaved()
     } catch (err) {
       setError(err.message)
@@ -98,11 +94,6 @@ function TypeForm({ initial, onClose, onSaved }) {
         <ErrorBox error={error} />
         <Field label="Nimi" error={errors.name}>
           <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoFocus />
-        </Field>
-        <Field label="Intensiivsus">
-          <select value={form.intensity} onChange={(e) => setForm({ ...form, intensity: e.target.value })}>
-            {INTENSITIES.map((i) => <option key={i}>{i}</option>)}
-          </select>
         </Field>
         <Field label="Kirjeldus">
           <textarea rows="3" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />

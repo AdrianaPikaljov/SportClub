@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 
-export function Pager({ page, totalPages, totalCount, onPage }) {
-  if (!totalCount) return null
+export function Pager({ page, totalPages, total, onPage }) {
+  if (!total) return null
   return (
     <div className="pager">
-      <span>Kokku {totalCount}</span>
+      <span>Kokku {total}</span>
       <button className="btn ghost small" disabled={page <= 1} onClick={() => onPage(page - 1)}>‹ Eelmine</button>
       <span>{page} / {Math.max(1, totalPages)}</span>
       <button className="btn ghost small" disabled={page >= totalPages} onClick={() => onPage(page + 1)}>Järgmine ›</button>
@@ -70,7 +70,7 @@ export function useDebounced(value, delay = 300) {
 
 /** Loads a paged list from the API whenever the query changes. */
 export function usePagedList(loader, deps) {
-  const [data, setData] = useState({ items: [], page: 1, totalPages: 0, totalCount: 0 })
+  const [data, setData] = useState({ items: [], page: 1, totalPages: 0, total: 0 })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
@@ -87,4 +87,25 @@ export function usePagedList(loader, deps) {
   }, [...deps, reloadKey])
 
   return { data, error, loading, reload: () => setReloadKey((k) => k + 1) }
+}
+
+/** Laeb API-st nimekirja (massiivi) iga kord, kui deps muutub. */
+export function useList(loader, deps) {
+  const [items, setItems] = useState([])
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    loader()
+      .then((d) => { if (!cancelled) { setItems(d || []); setError('') } })
+      .catch((e) => { if (!cancelled) setError(e.message) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [...deps, reloadKey])
+
+  return { items, error, loading, reload: () => setReloadKey((k) => k + 1) }
 }

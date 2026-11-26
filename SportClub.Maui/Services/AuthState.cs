@@ -14,28 +14,28 @@ public static class ApiConfig
     public static string WebSocketUrl => BaseUrl.Replace("http://", "ws://").Replace("https://", "wss://") + "ws/sessions";
 }
 
-/// <summary>Keeps the JWT and logged-in user. Token is stored in SecureStorage.</summary>
+/// <summary>Hoiab JWT-d ja sisseloginud kasutajat. Token on SecureStorage-is.</summary>
 public class AuthState
 {
     private const string TokenKey = "jwt";
     private const string UserKey = "user";
 
     public string? Token { get; private set; }
-    public UserDto? User { get; private set; }
+    public SignedInUser? User { get; private set; }
 
     public bool IsLoggedIn => Token is not null && User is not null;
     public bool IsTrainer => User?.Role == "Trainer";
 
     public event EventHandler? SignedOut;
 
-    public async Task SignInAsync(AuthResponse response)
+    public async Task SignInAsync(LoginResponse response, string email)
     {
         Token = response.Token;
-        User = response.User;
+        User = new SignedInUser(response.Name, email, response.Role);
         try
         {
             await SecureStorage.Default.SetAsync(TokenKey, response.Token);
-            Preferences.Default.Set(UserKey, System.Text.Json.JsonSerializer.Serialize(response.User, ApiClient.Json));
+            Preferences.Default.Set(UserKey, System.Text.Json.JsonSerializer.Serialize(User, ApiClient.Json));
         }
         catch
         {
@@ -51,8 +51,8 @@ public class AuthState
             var userJson = Preferences.Default.Get<string?>(UserKey, null);
             if (token is null || userJson is null) return false;
             Token = token;
-            User = System.Text.Json.JsonSerializer.Deserialize<UserDto>(userJson, ApiClient.Json);
-            return User is not null;
+            User = System.Text.Json.JsonSerializer.Deserialize<SignedInUser>(userJson, ApiClient.Json);
+            return User?.Role is not null && User.Name is not null;
         }
         catch
         {

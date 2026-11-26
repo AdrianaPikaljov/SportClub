@@ -38,12 +38,12 @@ public partial class LoginViewModel : BaseViewModel
         }
 
         var response = await _api.LoginAsync(Email.Trim(), Password);
-        if (response.User.Role is not ("Client" or "Trainer"))
+        if (response.Role is not ("Client" or "Trainer"))
         {
             ErrorMessage = "Mobiilirakendus on klientidele ja treeneritele. Admin kasutab veebiliidest.";
             return;
         }
-        await _auth.SignInAsync(response);
+        await _auth.SignInAsync(response, Email.Trim());
         Password = "";
         _realtime.Start();
         await Shell.Current.GoToAsync(_auth.IsTrainer ? "//sessions" : "//schedule");
@@ -89,17 +89,17 @@ public partial class ScheduleViewModel : BaseViewModel
         if (!_typesLoaded)
         {
             var types = await _api.GetTrainingTypesAsync();
-            foreach (var t in types.Items) Types.Add(new ChipItem(t.Id, t.Name));
+            foreach (var t in types) Types.Add(new ChipItem(t.Name, t.Name));
             _typesLoaded = true;
         }
 
         var day = Days.First(d => d.IsSelected).Date;
-        var from = day == DateTime.Today ? DateTime.Now : day; // today: only sessions that have not started
-        var typeId = Types.First(t => t.IsSelected).Id;
-        var page = await _api.GetSessionsAsync(from.ToUniversalTime(), day.AddDays(1).ToUniversalTime(), typeId);
+        var type = Types.First(t => t.IsSelected).Type;
+        var list = await _api.GetSessionsAsync(day, day, type);
 
         Sessions.Clear();
-        foreach (var s in page.Items) Sessions.Add(new SessionItem(s));
+        // Tänasest päevast näitame ainult neid, mis pole veel alanud.
+        foreach (var s in list.Where(s => s.Start > DateTime.Now)) Sessions.Add(new SessionItem(s));
         IsEmpty = Sessions.Count == 0;
     });
 
@@ -119,13 +119,13 @@ public partial class ScheduleViewModel : BaseViewModel
 
     [RelayCommand]
     private Task OpenAsync(SessionItem item) =>
-        Shell.Current.GoToAsync("session", new Dictionary<string, object> { ["Id"] = item.Id });
+        Shell.Current.GoToAsync("session", new Dictionary<string, object> { ["Session"] = item.Dto });
 }
 
 public partial class SessionDetailViewModel : BaseViewModel, IQueryAttributable
 {
     private readonly ApiClient _api;
-    private int _id;
+    private SessionDto? _dto;
 
     public SessionDetailViewModel(ApiClient api, RealtimeService realtime)
     {
@@ -143,21 +143,22 @@ public partial class SessionDetailViewModel : BaseViewModel, IQueryAttributable
 
     [ObservableProperty] private string passInfo = "";
     [ObservableProperty] private bool isBooked;
+    [ObservableProperty] private string bookedLabel = "";
     [ObservableProperty] private bool hasNoPass;
 
     public string When => Session is null ? "" :
-        $"{Session.Dto.StartsAt.ToLocalTime():ddd, dd.MM · HH:mm}–{Session.Dto.StartsAt.AddMinutes(Session.Dto.DurationMinutes).ToLocalTime():HH:mm}";
+        $"{Session.Dto.Start:ddd, dd.MM · HH:mm}–{Session.Dto.Start.AddMinutes(Session.Dto.DurationMinutes):HH:mm}";
 
-    public double Progress => Session is null || Session.Dto.MaxParticipants == 0
-        ? 0 : (Session.Dto.MaxParticipants - Session.FreeSpots) / (double)Session.Dto.MaxParticipants;
+    public double Progress => Session is null || Session.Dto.Capacity == 0
+        ? 0 : (Session.Dto.Capacity - Session.FreeSpots) / (double)Session.Dto.Capacity;
 
     public void ApplyQueryAttributes(IDictionary<string, object> query)
     {
-        if (query.TryGetValue("Id", out var id)) _id = Convert.ToInt32(id);
+        if (query.TryGetValue("Session", out var dto)) _dto = dto as SessionDto;
         LoadCommand.Execute(null);
     }
 
-    /// <summary>Reload when coming back (e.g. after buying a pass).</summary>
+    /// <summary>Uuenda, kui lehele tagasi tullakse (nt pärast kuukaardi ostu).</summary>
     public void Refresh()
     {
         if (Session is not null) LoadCommand.Execute(null);
@@ -166,26 +167,36 @@ public partial class SessionDetailViewModel : BaseViewModel, IQueryAttributable
     [RelayCommand]
     private Task LoadAsync() => RunAsync(async () =>
     {
-        var dto = await _api.GetSessionAsync(_id);
-        Session = new SessionItem(dto);
+        if (_dto is null) return;
 
-        var passes = await _api.GetMyPassesAsync();
-        var active = passes.FirstOrDefault(p => p.IsActive);
-        HasNoPass = active is null;
-        PassInfo = active is null
-            ? "Broneerimiseks on vaja kehtivat kuukaarti."
-            : $"Broneering kasutab 1 külastuse. Kuukaardil on alles {active.VisitsLeft} / {active.VisitsTotal}.";
+        // Värsked andmed sama päeva tunniplaanist (vabad kohad võisid muutuda).
+        var sameDay = await _api.GetSessionsAsync(_dto.Start.Date, _dto.Start.Date, null);
+        _dto = sameDay.FirstOrDefault(s => s.Id == _dto.Id) ?? _dto;
+        Session = new SessionItem(_dto);
 
-        var bookings = await _api.GetMyBookingsAsync(upcoming: true);
-        IsBooked = bookings.Any(b => b.SessionId == _id);
+        var pass = await _api.GetMyPassAsync();
+        HasNoPass = pass is null;
+        PassInfo = pass is null
+            ? "Registreerumiseks on vaja kehtivat kuukaarti."
+            : $"Registreerumine kasutab 1 külastuse. Kuukaardil on alles {pass.VisitsLeft} / {pass.VisitsTotal}.";
+
+        var mine = (await _api.GetMyBookingsAsync()).FirstOrDefault(b => b.SessionId == _dto.Id);
+        IsBooked = mine is not null;
+        BookedLabel = mine?.Status == "Waitlisted"
+            ? $"Oled ootejärjekorras, koht #{mine.Position}"
+            : "Sul on sellele treeningule koht ✓";
     });
 
     [RelayCommand]
     private Task BookAsync() => RunAsync(async () =>
     {
-        await _api.BookAsync(_id);
+        if (_dto is null) return;
+        var result = await _api.BookAsync(_dto.Id);
         IsBooked = true;
-        await ToastAsync("Broneeritud!", $"{Session?.Name} – {When}. Meeldetuletus tuleb tund enne algust.");
+        if (result.Waitlisted)
+            await ToastAsync("Treening on täis", $"Sind lisati ootejärjekorda, sinu koht: {result.Position}. Kui koht vabaneb, saad automaatselt treeningule.");
+        else
+            await ToastAsync("Registreeritud!", $"{Session?.Name} – {When}. Meeldetuletus tuleb tund enne algust.");
         await Shell.Current.GoToAsync("..");
     });
 
@@ -193,12 +204,11 @@ public partial class SessionDetailViewModel : BaseViewModel, IQueryAttributable
     private Task BuyPassAsync() => Shell.Current.GoToAsync("buypass");
 
     [RelayCommand]
-    private Task JoinWaitlistAsync() => RunAsync(async () =>
-    {
-        var entry = await _api.JoinWaitlistAsync(_id);
-        await ToastAsync("Oled ootejärjekorras", $"Sinu koht järjekorras: {entry.Position}. Kui koht vabaneb, saad automaatselt treeningule.");
-        await Shell.Current.GoToAsync("..");
-    });
+    private Task BackAsync() => Shell.Current.GoToAsync("..");
+
+    /// <summary>Täis treeningul paneb sama registreerumine kliendi automaatselt ootejärjekorda.</summary>
+    [RelayCommand]
+    private Task JoinWaitlistAsync() => BookAsync();
 }
 
 public partial class BookingsViewModel : BaseViewModel
@@ -231,23 +241,23 @@ public partial class BookingsViewModel : BaseViewModel
     [RelayCommand]
     private Task LoadAsync() => RunAsync(async () =>
     {
-        var upcoming = await _api.GetMyBookingsAsync(upcoming: true);
-        var all = await _api.GetMyBookingsAsync(upcoming: false);
-        var waitlist = await _api.GetMyWaitlistAsync();
+        // Üks päring: broneeringud (Booked) ja järjekorrakohad (Waitlisted) koos.
+        var all = await _api.GetMyBookingsAsync();
+        var now = DateTime.Now;
 
         Upcoming.Clear();
-        foreach (var b in upcoming) Upcoming.Add(new BookingItem(b));
+        foreach (var b in all.Where(b => b.Status == "Booked" && b.Start > now)) Upcoming.Add(new BookingItem(b));
         History.Clear();
-        foreach (var b in all.Where(b => b.StartsAt <= DateTime.UtcNow || b.Status == "Cancelled")) History.Add(new BookingItem(b));
+        foreach (var b in all.Where(b => b.Status == "Booked" && b.Start <= now).OrderByDescending(b => b.Start)) History.Add(new BookingItem(b));
         Waitlist.Clear();
-        foreach (var w in waitlist) Waitlist.Add(new WaitlistItem(w));
+        foreach (var w in all.Where(b => b.Status == "Waitlisted")) Waitlist.Add(new WaitlistItem(w));
         WaitlistTitle = Waitlist.Count > 0 ? $"Ootel ({Waitlist.Count})" : "Ootel";
     });
 
     [RelayCommand]
     private async Task CancelAsync(BookingItem item)
     {
-        if (!await Shell.Current.DisplayAlertAsync("Tühista broneering", $"{item.Name}, {item.When}?", "Tühista", "Ei")) return;
+        if (!await Shell.Current.DisplayAlertAsync("Tühista broneering", $"{item.Name}, {item.When}?\nKülastus läheb kuukaardile tagasi.", "Tühista", "Ei")) return;
         await RunAsync(() => _api.CancelBookingAsync(item.Dto.Id));
         await LoadAsync();
     }
@@ -256,7 +266,8 @@ public partial class BookingsViewModel : BaseViewModel
     private async Task LeaveAsync(WaitlistItem item)
     {
         if (!await Shell.Current.DisplayAlertAsync("Lahku järjekorrast", $"{item.Name}, {item.When}?", "Lahku", "Ei")) return;
-        await RunAsync(() => _api.LeaveWaitlistAsync(item.Dto.Id));
+        // Järjekorrast lahkumine = sama tühistamine (DELETE /api/bookings/{id}).
+        await RunAsync(() => _api.CancelBookingAsync(item.Dto.Id));
         await LoadAsync();
     }
 }
@@ -284,9 +295,8 @@ public partial class PassViewModel : BaseViewModel
     [ObservableProperty] private string buyButtonText = "Osta kuukaart";
 
     public ObservableCollection<BookingItem> Visits { get; } = new();
-    public ObservableCollection<NotificationDto> Notifications { get; } = new();
 
-    public string UserName => _auth.User?.FullName ?? "";
+    public string UserName => _auth.User?.Name ?? "";
     public string UserEmail => _auth.User?.Email ?? "";
     public string Initials => string.Concat(UserName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => w[0]));
 
@@ -297,30 +307,23 @@ public partial class PassViewModel : BaseViewModel
         OnPropertyChanged(nameof(UserEmail));
         OnPropertyChanged(nameof(Initials));
 
-        var passes = await _api.GetMyPassesAsync();
-        Pass = passes.Where(p => p.IsActive).OrderBy(p => p.ValidUntil).FirstOrDefault()
-               ?? passes.Where(p => !p.IsUpcoming).FirstOrDefault();
+        // Korraga on ainult üks aktiivne kuukaart (404 → null).
+        Pass = await _api.GetMyPassAsync();
         HasPass = Pass is not null;
-        var upcoming = passes.Where(p => p.IsUpcoming).OrderBy(p => p.ValidFrom).FirstOrDefault();
-        HasUpcoming = upcoming is not null;
-        UpcomingText = upcoming is null ? "" :
-            $"Järgmine kuukaart: {upcoming.PlanName ?? "kuukaart"} ({upcoming.VisitsTotal} külastust) kehtib alates {upcoming.ValidFrom.ToLocalTime():dd.MM.yyyy}.";
-        BuyButtonText = Pass?.IsActive == true ? "Osta järgmine kuukaart" : "Osta kuukaart";
+        HasUpcoming = false;
+        UpcomingText = "";
+        BuyButtonText = "Osta kuukaart";
         if (Pass is not null)
         {
-            MonthTitle = Pass.ValidFrom.ToLocalTime().ToString("MMMM yyyy");
-            ValidText = $"Kehtib kuni {Pass.ValidUntil.ToLocalTime():dd.MM.yyyy}";
+            MonthTitle = Pass.Plan;
+            ValidText = $"Kehtib {Pass.From:dd.MM.yyyy} – {Pass.Until:dd.MM.yyyy}";
             UsedProgress = Pass.VisitsTotal == 0 ? 0 : Pass.VisitsLeft / (double)Pass.VisitsTotal;
         }
 
-        var history = await _api.GetMyBookingsAsync(upcoming: false);
+        var bookings = await _api.GetMyBookingsAsync();
         Visits.Clear();
-        foreach (var b in history.Where(b => b.Status == "Active" && b.StartsAt <= DateTime.UtcNow).Take(5))
+        foreach (var b in bookings.Where(b => b.Status == "Booked" && b.Start <= DateTime.Now).OrderByDescending(b => b.Start).Take(5))
             Visits.Add(new BookingItem(b));
-
-        var notifications = await _api.GetMyNotificationsAsync();
-        Notifications.Clear();
-        foreach (var n in notifications.Take(5)) Notifications.Add(n);
     });
 
     [RelayCommand]

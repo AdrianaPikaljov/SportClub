@@ -18,7 +18,6 @@ public static class DependencyInjection
         services.AddScoped<ITrainingTypeRepository, TrainingTypeRepository>();
         services.AddScoped<ISessionRepository, SessionRepository>();
         services.AddScoped<IBookingRepository, BookingRepository>();
-        services.AddScoped<IWaitlistRepository, WaitlistRepository>();
         services.AddScoped<IMonthlyPassRepository, MonthlyPassRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IPassPlanRepository, PassPlanRepository>();

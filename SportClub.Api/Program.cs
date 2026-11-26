@@ -13,10 +13,10 @@ using SportClub.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ---------- Data + services (DI) ----------
+// ---------- Andmebaas ja teenused (DI) ----------
 builder.Services.AddInfrastructure(builder.Configuration.GetConnectionString("Default") ?? "Data Source=sportclub.db");
 
-builder.Services.AddSingleton<IClock, SystemClock>();
+builder.Services.AddSingleton<IClock, ClubClock>(); // Eesti aeg
 builder.Services.AddSingleton<WebSocketSessionNotifier>();
 builder.Services.AddSingleton<ISessionNotifier>(sp => sp.GetRequiredService<WebSocketSessionNotifier>());
 
@@ -80,8 +80,14 @@ builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 // ---------- CORS (React admin) ----------
+// Lubatud on appsettings.json Cors:Origins ja iga localhost-i port (Vite võib võtta 5174, kui 5173 on kinni).
 var origins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? new[] { "http://localhost:5173" };
-builder.Services.AddCors(o => o.AddPolicy("Admin", p => p.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod()));
+builder.Services.AddCors(o => o.AddPolicy("Admin", p => p
+    .SetIsOriginAllowed(origin =>
+        origins.Contains(origin, StringComparer.OrdinalIgnoreCase)
+        || (Uri.TryCreate(origin, UriKind.Absolute, out var uri) && (uri.IsLoopback || uri.Host == "localhost")))
+    .AllowAnyHeader()
+    .AllowAnyMethod()));
 
 // ---------- Swagger ----------
 builder.Services.AddEndpointsApiExplorer();
@@ -96,11 +102,13 @@ using (var scope = app.Services.CreateScope())
     if (db.Database.GetMigrations().Any())
         await db.Database.MigrateAsync();
     else
-        await db.Database.EnsureCreatedAsync(); // fallback if migrations were not generated yet
-    await SeedData.SeedRuntimeAsync(db, DateTime.UtcNow);
+        await db.Database.EnsureCreatedAsync(); // kui migratsioone pole veel loodud (dotnet ef migrations add ...)
+    await SeedData.SeedRuntimeAsync(db, app.Services.GetRequiredService<IClock>().Now);
 }
 
 // ---------- Pipeline ----------
+// CORS kõige ees: ka veavastused (400/500) saavad CORS-päised, muidu näitab brauser lihtsalt "Failed to fetch".
+app.UseCors("Admin");
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
@@ -116,7 +124,6 @@ app.UseSwaggerUI(c =>
     c.EnablePersistAuthorization();      // token stays after page refresh
 });
 
-app.UseCors("Admin");
 app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(30) });
 app.UseAuthentication();
 app.UseAuthorization();

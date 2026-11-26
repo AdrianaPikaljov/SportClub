@@ -1,297 +1,296 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace SportClub.Core.Dtos;
 
-// ---------- Common ----------
+// Väljapoole antakse ainult need klassid, mitte andmebaasi olemid.
+// Kuupäevad on tekstina: "2026-11-27", aeg koos kellaajaga "2026-11-27 18:00" (Eesti aeg).
 
-/// <summary>Üks lehekülg tulemusi: items + page, pageSize, totalCount, totalPages.</summary>
-public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount)
+// ---------- Ühised ----------
+
+/// <summary>Üks lehekülg tulemusi.</summary>
+public record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int Total)
 {
-    public int TotalPages => PageSize == 0 ? 0 : (int)Math.Ceiling(TotalCount / (double)PageSize);
+    public int TotalPages => PageSize == 0 ? 0 : (int)Math.Ceiling(Total / (double)PageSize);
 }
 
-/// <summary>Nimekirjade ühised parameetrid: otsing, sorteerimine ja leheküljed.</summary>
-public class ListQuery
+// ---------- Sisselogimine ----------
+
+public class RegisterRequest
 {
-    /// <summary>Otsingusõna.</summary>
-    /// <example>jooga</example>
-    public string? Search { get; set; }
+    /// <example>Anna Kask</example>
+    [Required(ErrorMessage = "Nimi on kohustuslik."), StringLength(100, MinimumLength = 2, ErrorMessage = "Nimi peab olema 2–100 tähemärki.")]
+    public string Name { get; set; } = "";
 
-    /// <summary>Mille järgi sorteerida, nt "name". Miinus ees ("-name") = kahanevalt.</summary>
-    /// <example>name</example>
-    public string? Sort { get; set; }
+    /// <example>anna@mail.ee</example>
+    [Required(ErrorMessage = "E-post on kohustuslik."), EmailAddress(ErrorMessage = "Vigane e-posti aadress.")]
+    public string Email { get; set; } = "";
 
-    /// <example>1</example>
-    [Range(1, int.MaxValue)]
-    public int Page { get; set; } = 1;
-
-    /// <example>10</example>
-    [Range(1, 100)]
-    public int PageSize { get; set; } = 10;
+    /// <example>Parool123</example>
+    [Required(ErrorMessage = "Parool on kohustuslik."), StringLength(100, MinimumLength = 8, ErrorMessage = "Parool peab olema vähemalt 8 tähemärki.")]
+    public string Password { get; set; } = "";
 }
-
-// ---------- Auth ----------
 
 public class LoginRequest
 {
     /// <example>klient@sportclub.ee</example>
-    [Required, EmailAddress]
+    [Required(ErrorMessage = "E-post on kohustuslik."), EmailAddress(ErrorMessage = "Vigane e-posti aadress.")]
     public string Email { get; set; } = "";
 
     /// <example>Klient123!</example>
-    [Required]
+    [Required(ErrorMessage = "Parool on kohustuslik.")]
     public string Password { get; set; } = "";
 }
 
-public class RegisterRequest
+public record LoginResponse(string Token, string Role, string Name);
+
+public record UserDto(int Id, string Name, string Email, string Role);
+
+// ---------- Tunniplaan ----------
+
+/// <summary>Treening tunniplaanis. free = vabade kohtade arv.</summary>
+public record SessionDto(int Id, string Type, int TrainerId, string Trainer, string StartsAt, int DurationMinutes, int Capacity, int Free);
+
+/// <summary>Treeningu lisamine ja muutmine (admin). Sama kuju annab GET /api/sessions/{id}.</summary>
+public class SessionSaveDto
 {
-    /// <example>Mari Tamm</example>
-    [Required, StringLength(100, MinimumLength = 2)]
-    public string FullName { get; set; } = "";
+    /// <summary>Treeningutüübi id (vt GET /api/types).</summary>
+    /// <example>1</example>
+    [Range(1, int.MaxValue, ErrorMessage = "typeId on kohustuslik.")]
+    public int TypeId { get; set; }
 
-    /// <example>mari.tamm@example.com</example>
-    [Required, EmailAddress]
-    public string Email { get; set; } = "";
+    /// <summary>Treeneri id (vt GET /api/trainers).</summary>
+    /// <example>1</example>
+    [Range(1, int.MaxValue, ErrorMessage = "trainerId on kohustuslik.")]
+    public int TrainerId { get; set; }
 
-    /// <example>Parool123!</example>
-    [Required, StringLength(100, MinimumLength = 8)]
-    public string Password { get; set; } = "";
+    /// <summary>Kuupäev kujul AAAA-KK-PP.</summary>
+    /// <example>2026-11-27</example>
+    [Required(ErrorMessage = "Kuupäev on kohustuslik.")]
+    [RegularExpression(@"^\d{4}-\d{2}-\d{2}$", ErrorMessage = "Kuupäev peab olema kujul AAAA-KK-PP, nt 2026-11-27")]
+    public string Date { get; set; } = "";
+
+    /// <summary>Kellaaeg kujul TT:MM (Eesti aeg).</summary>
+    /// <example>18:00</example>
+    [Required(ErrorMessage = "Kellaaeg on kohustuslik.")]
+    [RegularExpression(@"^\d{2}:\d{2}$", ErrorMessage = "Kellaaeg peab olema kujul TT:MM, nt 18:00")]
+    public string Time { get; set; } = "";
+
+    /// <example>60</example>
+    [Range(15, 240, ErrorMessage = "Kestus peab olema 15–240 minutit.")]
+    public int DurationMinutes { get; set; } = 60;
+
+    /// <summary>Kohtade arv.</summary>
+    /// <example>12</example>
+    [Range(1, 200, ErrorMessage = "Kohtade arv peab olema 1–200.")]
+    public int Capacity { get; set; } = 12;
 }
 
-public record AuthResponse(string Token, DateTime ExpiresAt, UserDto User);
+// ---------- Treenerid ----------
 
-public record UserDto(int Id, string FullName, string Email, string Role, int? TrainerId);
+/// <summary>Treener. email (konto e-post) näeb ainult admin, teistele seda välja ei anta.</summary>
+public record TrainerDto(int Id, string Name, string Specialty, string? Description, string? Phone,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Email);
 
-// ---------- Trainers ----------
-
-public record TrainerDto(int Id, string FullName, string? Bio, string? Phone, int? UserId);
-
+/// <summary>Treeneri andmed koos konto e-postiga. Sama kuju annab GET /api/trainers/{id}.</summary>
 public class TrainerSaveDto
 {
-    /// <example>Kertu Saar</example>
-    [Required, StringLength(100, MinimumLength = 2)]
-    public string FullName { get; set; } = "";
+    /// <example>Mari Tamm</example>
+    [Required(ErrorMessage = "Nimi on kohustuslik."), StringLength(100, MinimumLength = 2, ErrorMessage = "Nimi peab olema 2–100 tähemärki.")]
+    public string Name { get; set; } = "";
 
-    /// <example>Joogaõpetaja, 8 aastat kogemust.</example>
+    /// <example>Jooga</example>
+    [Required(ErrorMessage = "Eriala on kohustuslik."), StringLength(60, ErrorMessage = "Eriala võib olla kuni 60 tähemärki.")]
+    public string Specialty { get; set; } = "";
+
+    /// <example>10 aastat kogemust</example>
     [StringLength(1000)]
-    public string? Bio { get; set; }
+    public string? Description { get; set; }
 
     /// <example>+372 5555 1234</example>
-    [Phone, StringLength(30)]
+    [StringLength(30), RegularExpression(@"^\+?[0-9 \-]{5,30}$", ErrorMessage = "Vigane telefoninumber, nt +372 5555 1234")]
     public string? Phone { get; set; }
 
-    /// <summary>Seotud kasutajakonto (roll Trainer), valikuline.</summary>
-    public int? UserId { get; set; }
+    /// <summary>Treeneri konto e-post (sellega logib ta sisse).</summary>
+    /// <example>mari@sportclub.ee</example>
+    [Required(ErrorMessage = "E-post on kohustuslik."), EmailAddress(ErrorMessage = "Vigane e-posti aadress.")]
+    public string Email { get; set; } = "";
 }
 
-// ---------- Training types ----------
+/// <summary>Treeneri muutmine. newPassword on valikuline: tühi = parool jääb samaks.</summary>
+public class TrainerUpdateDto : TrainerSaveDto
+{
+    /// <summary>Uus parool (vähemalt 8 tähemärki). Tühi või null = parool jääb samaks.</summary>
+    [StringLength(100)]
+    public string? NewPassword { get; set; }
+}
 
-public record TrainingTypeDto(int Id, string Name, string? Description, string Intensity);
+/// <summary>Uus treener koos sisselogimise kontoga.</summary>
+public class TrainerCreateDto : TrainerSaveDto
+{
+    /// <example>Treener123</example>
+    [Required(ErrorMessage = "Parool on kohustuslik."), StringLength(100, MinimumLength = 8, ErrorMessage = "Parool peab olema vähemalt 8 tähemärki.")]
+    public string Password { get; set; } = "";
+}
 
+// ---------- Treeningutüübid ----------
+
+public record TrainingTypeDto(int Id, string Name, string? Description);
+
+/// <summary>Tüübi lisamine ja muutmine. Sama kuju annab GET /api/types/{id}.</summary>
 public class TrainingTypeSaveDto
 {
     /// <example>Jooga</example>
-    [Required, StringLength(60, MinimumLength = 2)]
+    [Required(ErrorMessage = "Nimi on kohustuslik."), StringLength(60, MinimumLength = 2, ErrorMessage = "Nimi peab olema 2–60 tähemärki.")]
     public string Name { get; set; } = "";
 
     /// <example>Rahulik venitus ja hingamine.</example>
     [StringLength(1000)]
     public string? Description { get; set; }
-
-    /// <example>Madal</example>
-    [Required, RegularExpression("Madal|Keskmine|Kõrge", ErrorMessage = "Intensiivsus peab olema Madal, Keskmine või Kõrge.")]
-    public string Intensity { get; set; } = "Keskmine";
 }
 
-// ---------- Sessions (timetable) ----------
+// ---------- Kuukaardid ----------
 
-public record SessionDto(
-    int Id,
-    int TrainingTypeId,
-    string TrainingTypeName,
-    string Intensity,
-    int TrainerId,
-    string TrainerName,
-    DateTime StartsAt,
-    int DurationMinutes,
-    string Room,
-    int MaxParticipants,
-    int BookedCount,
-    int FreeSpots,
-    int WaitlistCount);
+public record PassPlanDto(int Id, string Name, int Visits, int Days, decimal Price);
 
-public class SessionQuery : ListQuery
-{
-    /// <summary>Alates (UTC). Vaikimisi tänasest.</summary>
-    /// <example>2026-11-16T00:00:00Z</example>
-    public DateTime? From { get; set; }
-
-    /// <summary>Kuni (UTC).</summary>
-    /// <example>2026-11-23T00:00:00Z</example>
-    public DateTime? To { get; set; }
-
-    /// <summary>Treeningutüübi id (1 Jooga, 2 HIIT, 3 Spinning, 4 Pilates, 5 Crossfit).</summary>
-    /// <example>1</example>
-    public int? Type { get; set; }
-
-    /// <example>2</example>
-    public int? TrainerId { get; set; }
-}
-
-public class SessionSaveDto : IValidatableObject
-{
-    /// <example>1</example>
-    [Range(1, int.MaxValue)]
-    public int TrainingTypeId { get; set; }
-
-    /// <example>1</example>
-    [Range(1, int.MaxValue)]
-    public int TrainerId { get; set; }
-
-    /// <summary>Algusaeg UTC-s (07:00 Eesti aja järgi = 05:00Z).</summary>
-    /// <example>2026-11-20T07:00:00Z</example>
-    [Required]
-    public DateTime StartsAt { get; set; }
-
-    /// <example>60</example>
-    [Range(15, 240)]
-    public int DurationMinutes { get; set; } = 60;
-
-    /// <example>Saal 2</example>
-    [Required, StringLength(50)]
-    public string Room { get; set; } = "";
-
-    /// <example>15</example>
-    [Range(1, 200)]
-    public int MaxParticipants { get; set; } = 10;
-
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        if (StartsAt.ToUniversalTime() < DateTime.UtcNow.AddMinutes(-1))
-            yield return new ValidationResult("Treening ei saa alata minevikus.", new[] { nameof(StartsAt) });
-    }
-}
-
-public record ParticipantDto(int BookingId, int UserId, string FullName, string Email, bool? Attended);
-
-// ---------- Bookings ----------
-
-public record BookingDto(
-    int Id,
-    int SessionId,
-    string TrainingTypeName,
-    string TrainerName,
-    string Room,
-    DateTime StartsAt,
-    string Status,
-    bool? Attended,
-    DateTime CreatedAt);
-
-public class AttendanceDto
-{
-    /// <summary>true = kohal, false = puudus.</summary>
-    /// <example>true</example>
-    [Required]
-    public bool? Attended { get; set; }
-}
-
-// ---------- Waitlist ----------
-
-public record WaitlistEntryDto(int Id, int SessionId, string TrainingTypeName, DateTime StartsAt, int Position, DateTime CreatedAt);
-
-public record PromoteResultDto(int Promoted, int Skipped);
-
-// ---------- Monthly pass ----------
-
-public record MonthlyPassDto(int Id, int UserId, string UserName, DateTime ValidFrom, DateTime ValidUntil, int VisitsTotal, int VisitsUsed, int VisitsLeft, bool IsActive,
-    string? PlanName, decimal? PricePaid, DateTime? PurchasedAt, bool IsUpcoming);
-
-// ---------- Pass plans (what the club sells) ----------
-
-public record PassPlanDto(int Id, string Name, string? Description, int Visits, int DurationDays, decimal Price, bool IsActive);
-
+/// <summary>Tariifi lisamine ja muutmine. Sama kuju annab GET /api/pass-plans/{id}.</summary>
 public class PassPlanSaveDto
 {
-    /// <example>Kuukaart 12</example>
-    [Required, StringLength(60, MinimumLength = 2)]
+    /// <example>8 külastust</example>
+    [Required(ErrorMessage = "Nimi on kohustuslik."), StringLength(60, MinimumLength = 2, ErrorMessage = "Nimi peab olema 2–60 tähemärki.")]
     public string Name { get; set; } = "";
 
-    /// <example>12 grupitreeningut 30 päeva jooksul.</example>
-    [StringLength(500)]
-    public string? Description { get; set; }
+    /// <example>8</example>
+    [Range(1, 100, ErrorMessage = "Külastusi peab olema 1–100.")]
+    public int Visits { get; set; } = 8;
 
-    /// <example>12</example>
-    [Range(1, 100)]
-    public int Visits { get; set; } = 12;
-
+    /// <summary>Mitu päeva kaart kehtib.</summary>
     /// <example>30</example>
-    [Range(1, 365)]
-    public int DurationDays { get; set; } = 30;
+    [Range(1, 365, ErrorMessage = "Kehtivus peab olema 1–365 päeva.")]
+    public int Days { get; set; } = 30;
 
-    /// <example>49.00</example>
-    [Range(typeof(decimal), "0", "1000")]
+    /// <example>49.90</example>
+    [Range(typeof(decimal), "0", "1000", ErrorMessage = "Hind peab olema 0–1000 €.")]
     public decimal Price { get; set; }
-
-    /// <example>true</example>
-    public bool IsActive { get; set; } = true;
 }
 
-public class PurchasePassRequest
+public class BuyPassRequest
 {
-    /// <summary>Ostetava paketi id (vt GET /api/pass-plans).</summary>
-    /// <example>3</example>
-    [Range(1, int.MaxValue)]
+    /// <summary>Tariifi id (vt GET /api/pass-plans).</summary>
+    /// <example>2</example>
+    [Range(1, int.MaxValue, ErrorMessage = "planId on kohustuslik.")]
     public int PlanId { get; set; }
 }
 
-public class MonthlyPassCreateDto : IValidatableObject
+/// <summary>Kliendi enda kuukaart.</summary>
+public record MyPassDto(int Id, string Plan, int VisitsLeft, int VisitsTotal, string ValidFrom, string ValidUntil);
+
+/// <summary>Kuukaart admini nimekirjas.</summary>
+public record PassDto(int Id, string Client, string Email, string Plan, int VisitsLeft, int VisitsTotal, string ValidFrom, string ValidUntil,
+    decimal PricePaid, bool Active);
+
+// ---------- Broneeringud ----------
+
+/// <summary>
+/// Kliendi broneering. status: Booked = koht olemas, Waitlisted = ootejärjekorras (position = koht järjekorras).
+/// attended: null = märkimata, true = kohal, false = puudus.
+/// </summary>
+public record BookingDto(int Id, int SessionId, string Type, string Trainer, string StartsAt, string Status, int? Position, bool? Attended);
+
+public record WaitlistDto(int Id, int SessionId, int Position);
+
+/// <summary>Broneering admini nimekirjas.</summary>
+public record AdminBookingDto(int Id, int SessionId, string Client, string Type, string Trainer, string StartsAt, string Status,
+    int? Position, bool? Attended, string CreatedAt);
+
+/// <summary>Sorteerimine: uusimad või vanimad broneeringud.</summary>
+public enum BookingSort
 {
-    /// <example>3</example>
-    [Range(1, int.MaxValue)]
-    public int UserId { get; set; }
-
-    /// <example>2026-11-01T00:00:00Z</example>
-    [Required]
-    public DateTime ValidFrom { get; set; }
-
-    /// <example>2026-11-30T23:59:59Z</example>
-    [Required]
-    public DateTime ValidUntil { get; set; }
-
-    /// <example>12</example>
-    [Range(1, 100)]
-    public int VisitsTotal { get; set; } = 12;
-
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        if (ValidUntil <= ValidFrom)
-            yield return new ValidationResult("Lõppkuupäev peab olema hilisem kui alguskuupäev.", new[] { nameof(ValidUntil) });
-    }
+    Uusimad,
+    Vanimad
 }
 
-// ---------- Notifications / worker ----------
+// ---------- Treener ----------
 
-public record StartingSessionDto(int SessionId, string TrainingTypeName, DateTime StartsAt, int PendingReminders);
+/// <summary>
+/// Treeneri treening. status: "Tulemas" (pole alanud), "Kohalolu märkimata", "Kohalolu märgitud".
+/// </summary>
+public record TrainerSessionDto(int Id, string Type, string StartsAt, int DurationMinutes, int Capacity, int Booked, int Waitlisted, string Status);
 
-public class SendReminderRequest
+/// <summary>Üks rida osalejate nimekirjas.</summary>
+public class AttendanceItemDto
 {
-    /// <example>12</example>
-    [Range(1, int.MaxValue)]
-    public int SessionId { get; set; }
+    /// <example>31</example>
+    public int BookingId { get; set; }
+
+    /// <summary>Ainult info jaoks, salvestamisel ei kasutata.</summary>
+    /// <example>Anna Kask</example>
+    public string? Name { get; set; }
+
+    /// <summary>true = kohal, false = ei olnud.</summary>
+    /// <example>true</example>
+    [Required(ErrorMessage = "attended peab olema true või false.")]
+    public bool? Attended { get; set; }
 }
 
-public record SendReminderResultDto(int SessionId, int Sent);
+public class AttendanceRequest
+{
+    /// <summary>true = kohal, false = ei olnud.</summary>
+    /// <example>true</example>
+    [Required(ErrorMessage = "attended peab olema true või false.")]
+    public bool? Attended { get; set; }
+}
 
-public record NotificationDto(int Id, int? SessionId, string Type, string Message, DateTime CreatedAt, bool IsRead);
+// ---------- Statistika ----------
 
-// ---------- Statistics ----------
+/// <summary>fillRate = mitu protsenti kohtadest on keskmiselt täidetud.</summary>
+public record PopularDto(string Type, int Sessions, int Bookings, int Attended, int FillRate);
 
-public record PopularTrainingDto(int TrainingTypeId, string Name, int Sessions, int Bookings, int Attended, double AverageFillPercent);
+// ---------- Taustateenus ----------
 
-// ---------- Realtime ----------
+public record PromotedDto(int BookingId, int SessionId, string Name);
+
+/// <summary>promoted = järjekorrast treeningule viidud, removed = järjekorrast eemaldatud (kuukaart puudus või treening algab tunni aja jooksul).</summary>
+public record PromoteResultDto(List<PromotedDto> Promoted, int Removed);
+
+public record ReminderParticipantDto(int BookingId, string Name, string Email);
+
+public record StartingSessionDto(int SessionId, string Type, string StartsAt, List<ReminderParticipantDto> Participants);
+
+public class NotificationRequest
+{
+    /// <summary>Broneeringu id (vt GET /api/sessions/starting).</summary>
+    /// <example>31</example>
+    [Range(1, int.MaxValue, ErrorMessage = "bookingId on kohustuslik.")]
+    public int BookingId { get; set; }
+}
+
+public record NotificationDto(int Id, int BookingId, string Name, string Message, string CreatedAt);
+
+// ---------- Reaalajas ----------
 
 /// <summary>WebSocketi sõnum kanalis /ws/sessions.</summary>
 public record FreeSpotsChangedMessage(int SessionId, int Free)
 {
     public string Type => "FreeSpotsChanged";
+}
+
+/// <summary>Kuupäevade ja kellaaegade vorming.</summary>
+public static class ClubTime
+{
+    public const string DateFormat = "yyyy-MM-dd";
+    public const string DateTimeFormat = "yyyy-MM-dd HH:mm";
+
+    public static string Format(DateTime value) => value.ToString(DateTimeFormat, System.Globalization.CultureInfo.InvariantCulture);
+    public static string FormatDate(DateTime value) => value.ToString(DateFormat, System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>Loeb kuupäeva "2026-11-27". Vale kuju korral tuleb 400.</summary>
+    public static DateTime? ParseDate(string? text, string name)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        if (DateTime.TryParseExact(text.Trim(), DateFormat, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var date))
+            return date;
+        throw new Exceptions.BusinessRuleException($"Parameeter '{name}': kuupäev peab olema kujul AAAA-KK-PP, nt 2026-11-27");
+    }
 }

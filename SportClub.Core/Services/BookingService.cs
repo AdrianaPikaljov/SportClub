@@ -7,34 +7,43 @@ namespace SportClub.Core.Services;
 
 public interface IBookingService
 {
+    /// <summary>Broneerib koha. Kui kohti pole, paneb kliendi ootejärjekorda (status = Waitlisted).</summary>
     Task<BookingDto> BookAsync(int sessionId, CurrentUser user, CancellationToken ct = default);
+    /// <summary>Paneb täis treeningu ootejärjekorda (ülesande nõue, sama mis BookAsync täis treeningul).</summary>
+    Task<WaitlistDto> JoinWaitlistAsync(int sessionId, CurrentUser user, CancellationToken ct = default);
+    Task<List<BookingDto>> GetMyAsync(int userId, CancellationToken ct = default);
+    /// <summary>Tühistab broneeringu või eemaldab ootejärjekorrast.</summary>
     Task CancelAsync(int bookingId, CurrentUser user, CancellationToken ct = default);
-    Task<List<BookingDto>> GetMyAsync(int userId, bool upcomingOnly, CancellationToken ct = default);
-    Task<BookingDto> SetAttendanceAsync(int bookingId, bool attended, CurrentUser user, CancellationToken ct = default);
+    Task<PagedResult<AdminBookingDto>> SearchAsync(string? search, BookingStatus? status, BookingSort sort, int page, CancellationToken ct = default);
+    Task<AttendanceItemDto> SetAttendanceAsync(int bookingId, bool attended, CurrentUser user, CancellationToken ct = default);
 }
 
 /// <summary>
-/// Booking rules:
-/// a session has a limited number of spots, a booking uses one visit from the monthly pass,
-/// cancelling before the start gives the visit back.
+/// Broneerimise reeglid:
+/// - broneerimiseks on vaja kehtivat kuukaarti, millel on külastusi alles;
+/// - broneering võtab kuukaardilt 1 külastuse, tühistamine annab selle tagasi;
+/// - tühistada saab kuni 2 tundi enne algust (admin alati);
+/// - täis treeningu korral läheb klient ootejärjekorda, külastust siis veel ei võeta.
 /// </summary>
 public class BookingService : IBookingService
 {
+    public const int CancelHoursBefore = 2;
+    public const int WaitlistClosesMinutesBefore = 60;
+    public const int AdminPageSize = 20;
+
     private readonly ISessionRepository _sessions;
     private readonly IBookingRepository _bookings;
-    private readonly IWaitlistRepository _waitlist;
     private readonly IMonthlyPassRepository _passes;
     private readonly ITrainerRepository _trainers;
     private readonly IUnitOfWork _uow;
     private readonly ISessionNotifier _notifier;
     private readonly IClock _clock;
 
-    public BookingService(ISessionRepository sessions, IBookingRepository bookings, IWaitlistRepository waitlist,
-        IMonthlyPassRepository passes, ITrainerRepository trainers, IUnitOfWork uow, ISessionNotifier notifier, IClock clock)
+    public BookingService(ISessionRepository sessions, IBookingRepository bookings, IMonthlyPassRepository passes,
+        ITrainerRepository trainers, IUnitOfWork uow, ISessionNotifier notifier, IClock clock)
     {
         _sessions = sessions;
         _bookings = bookings;
-        _waitlist = waitlist;
         _passes = passes;
         _trainers = trainers;
         _uow = uow;
@@ -44,87 +53,144 @@ public class BookingService : IBookingService
 
     public async Task<BookingDto> BookAsync(int sessionId, CurrentUser user, CancellationToken ct = default)
     {
-        var now = _clock.UtcNow;
-        var session = await _sessions.GetDetailedAsync(sessionId, ct) ?? throw new NotFoundException("Treening", sessionId);
+        var (session, pass) = await CheckCanJoinAsync(sessionId, user, ct);
+        var booked = await _sessions.CountBookedAsync(sessionId, ct);
 
-        if (session.StartsAt <= now)
+        if (booked < session.Capacity)
+        {
+            var booking = new Booking
+            {
+                SessionId = sessionId, Session = session, UserId = user.Id,
+                MonthlyPassId = pass.Id, Status = BookingStatus.Booked, CreatedAt = _clock.Now
+            };
+            pass.VisitsUsed++;
+            await _bookings.AddAsync(booking, ct);
+            await _uow.SaveChangesAsync(ct);
+            await _notifier.FreeSpotsChangedAsync(sessionId, session.Capacity - (booked + 1), ct);
+            return booking.ToDto(null);
+        }
+
+        // Kohti pole → ootejärjekorda.
+        var entry = await AddToWaitlistAsync(session, user, ct);
+        return entry.Booking.ToDto(entry.Position);
+    }
+
+    public async Task<WaitlistDto> JoinWaitlistAsync(int sessionId, CurrentUser user, CancellationToken ct = default)
+    {
+        var (session, _) = await CheckCanJoinAsync(sessionId, user, ct);
+        if (await _sessions.CountBookedAsync(sessionId, ct) < session.Capacity)
+            throw new ConflictException("Treeningul on veel vabu kohti. Broneeri koht otse: POST /api/sessions/{id}/bookings.", "Vabu kohti on");
+
+        var entry = await AddToWaitlistAsync(session, user, ct);
+        return new WaitlistDto(entry.Booking.Id, sessionId, entry.Position);
+    }
+
+    /// <summary>Ühised kontrollid: treening on olemas ja pole alanud, klient pole veel registreerunud, kuukaart on olemas.</summary>
+    private async Task<(Session Session, MonthlyPass Pass)> CheckCanJoinAsync(int sessionId, CurrentUser user, CancellationToken ct)
+    {
+        var session = await _sessions.GetDetailedAsync(sessionId, ct) ?? throw new NotFoundException("Treening", sessionId);
+        if (session.StartsAt <= _clock.Now)
             throw new BusinessRuleException("Treening on juba alanud või toimunud.");
 
-        if (await _bookings.GetActiveAsync(sessionId, user.Id, ct) is not null)
-            throw new ConflictException("Sul on sellele treeningule juba broneering.", "Juba broneeritud");
-
-        var booked = await _sessions.CountActiveBookingsAsync(sessionId, ct);
-        if (booked >= session.MaxParticipants)
-            throw new SessionFullException(sessionId);
+        var existing = await _bookings.GetForUserAsync(sessionId, user.Id, ct);
+        if (existing is not null)
+            throw existing.Status == BookingStatus.Booked
+                ? new ConflictException("Oled sellele treeningule juba registreerunud.", "Juba registreeritud")
+                : new ConflictException("Oled selle treeningu ootejärjekorras juba olemas.", "Juba järjekorras");
 
         var pass = await _passes.GetUsableAsync(user.Id, session.StartsAt, ct)
-                   ?? throw new BusinessRuleException("Sul pole treeningu kuupäeval kehtivat kuukaarti, millel oleks külastusi alles.", "Kuukaart puudub");
+                   ?? throw new BusinessRuleException("Sul ei ole kehtivat kuukaarti või külastused on otsas. Osta kuukaart: POST /api/passes.",
+                       "Kuukaart puudub");
+        return (session, pass);
+    }
 
-        var booking = new Booking
+    private async Task<(Booking Booking, int Position)> AddToWaitlistAsync(Session session, CurrentUser user, CancellationToken ct)
+    {
+        // Tund enne algust järjekord suletakse (Worker eemaldab siis kõik ootajad).
+        if (session.StartsAt <= _clock.Now.AddMinutes(WaitlistClosesMinutesBefore))
+            throw new SessionFullException(session.Id, waitlistClosed: true);
+
+        var entry = new Booking
         {
-            SessionId = sessionId,
-            Session = session,
-            UserId = user.Id,
-            MonthlyPassId = pass.Id,
-            CreatedAt = now
+            SessionId = session.Id, Session = session, UserId = user.Id,
+            Status = BookingStatus.Waitlisted, CreatedAt = _clock.Now
         };
-        pass.VisitsUsed++;
-        await _bookings.AddAsync(booking, ct);
-
-        // If the user was waiting in the queue, they don't need that place any more.
-        var entry = await _waitlist.GetAsync(sessionId, user.Id, ct);
-        if (entry is not null) _waitlist.Remove(entry);
-
+        await _bookings.AddAsync(entry, ct);
         await _uow.SaveChangesAsync(ct);
-        await _notifier.FreeSpotsChangedAsync(sessionId, session.MaxParticipants - (booked + 1), ct);
-        return booking.ToDto();
+        return (entry, await PositionAsync(entry, ct));
+    }
+
+    public async Task<List<BookingDto>> GetMyAsync(int userId, CancellationToken ct = default)
+    {
+        var result = new List<BookingDto>();
+        foreach (var b in await _bookings.GetAllForUserAsync(userId, ct))
+            result.Add(b.ToDto(b.Status == BookingStatus.Waitlisted ? await PositionAsync(b, ct) : null));
+        return result;
     }
 
     public async Task CancelAsync(int bookingId, CurrentUser user, CancellationToken ct = default)
     {
-        var booking = await _bookings.GetWithSessionAsync(bookingId, ct) ?? throw new NotFoundException("Broneering", bookingId);
-
+        var booking = await _bookings.GetDetailedAsync(bookingId, ct) ?? throw new NotFoundException("Broneering", bookingId);
         if (booking.UserId != user.Id && !user.IsAdmin)
-            throw new ForbiddenException("Saad tühistada ainult oma broneeringuid.");
-        if (booking.Status == BookingStatus.Cancelled)
-            throw new ConflictException("Broneering on juba tühistatud.");
+            throw new ForbiddenException("See on teise kliendi broneering.");
 
-        var now = _clock.UtcNow;
-        if (booking.Session!.StartsAt <= now)
-            throw new BusinessRuleException("Alanud treeningu broneeringut ei saa tühistada.");
+        var session = booking.Session!;
+        var now = _clock.Now;
 
-        booking.Status = BookingStatus.Cancelled;
-        booking.CancelledAt = now;
-        if (booking.MonthlyPass is not null && booking.MonthlyPass.VisitsUsed > 0)
-            booking.MonthlyPass.VisitsUsed--; // visit goes back to the pass
+        if (booking.Status == BookingStatus.Waitlisted)
+        {
+            // Järjekorrast lahkumine: ajapiirangut pole, külastust ei võetud.
+            _bookings.Remove(booking);
+            await _uow.SaveChangesAsync(ct);
+            return;
+        }
 
+        if (!user.IsAdmin && session.StartsAt - now < TimeSpan.FromHours(CancelHoursBefore))
+            throw new BusinessRuleException($"Tühistada saab kuni {CancelHoursBefore} tundi enne treeningu algust. Külastus jääb kasutatuks.");
+
+        if (session.StartsAt > now && booking.MonthlyPass is { VisitsUsed: > 0 })
+            booking.MonthlyPass.VisitsUsed--; // külastus läheb kuukaardile tagasi
+
+        _bookings.Remove(booking);
         await _uow.SaveChangesAsync(ct);
 
-        var booked = await _sessions.CountActiveBookingsAsync(booking.SessionId, ct);
-        await _notifier.FreeSpotsChangedAsync(booking.SessionId, booking.Session.MaxParticipants - booked, ct);
-        // The freed spot is given to the first person in the waitlist by the Worker (POST /api/waitlist/promote).
+        // Vabanenud koha annab järjekorras esimesele Worker (POST /api/waitlist/promote).
+        var booked = await _sessions.CountBookedAsync(session.Id, ct);
+        await _notifier.FreeSpotsChangedAsync(session.Id, session.Capacity - booked, ct);
     }
 
-    public async Task<List<BookingDto>> GetMyAsync(int userId, bool upcomingOnly, CancellationToken ct = default) =>
-        (await _bookings.GetForUserAsync(userId, upcomingOnly, _clock.UtcNow, ct)).Select(b => b.ToDto()).ToList();
-
-    public async Task<BookingDto> SetAttendanceAsync(int bookingId, bool attended, CurrentUser user, CancellationToken ct = default)
+    public async Task<PagedResult<AdminBookingDto>> SearchAsync(string? search, BookingStatus? status, BookingSort sort, int page,
+        CancellationToken ct = default)
     {
-        var booking = await _bookings.GetWithSessionAsync(bookingId, ct) ?? throw new NotFoundException("Broneering", bookingId);
+        if (page < 1) throw new BusinessRuleException("Lehekülg (page) peab olema vähemalt 1.");
+        var result = await _bookings.SearchAsync(search, status, sort, page, AdminPageSize, ct);
 
+        var items = new List<AdminBookingDto>();
+        foreach (var b in result.Items)
+            items.Add(b.ToAdminDto(b.Status == BookingStatus.Waitlisted ? await PositionAsync(b, ct) : null));
+        return new PagedResult<AdminBookingDto>(items, result.Page, result.PageSize, result.Total);
+    }
+
+    public async Task<AttendanceItemDto> SetAttendanceAsync(int bookingId, bool attended, CurrentUser user, CancellationToken ct = default)
+    {
+        var booking = await _bookings.GetDetailedAsync(bookingId, ct) ?? throw new NotFoundException("Broneering", bookingId);
         if (!user.IsAdmin)
         {
             var trainer = await _trainers.GetByUserIdAsync(user.Id, ct);
             if (trainer is null || trainer.Id != booking.Session!.TrainerId)
-                throw new ForbiddenException("Kohalolu saab märkida ainult selle treeningu treener.");
+                throw new ForbiddenException("See on teise treeneri treeningu osaleja.");
         }
-        if (booking.Status != BookingStatus.Active)
-            throw new BusinessRuleException("Tühistatud broneeringule ei saa kohalolu märkida.");
-        if (booking.Session!.StartsAt > _clock.UtcNow.AddMinutes(30))
-            throw new BusinessRuleException("Kohalolu saab märkida alates 30 minutit enne treeningu algust.");
+        if (booking.Status != BookingStatus.Booked)
+            throw new BusinessRuleException("See inimene on ootejärjekorras, mitte osaleja.");
+        if (booking.Session!.StartsAt > _clock.Now)
+            throw new BusinessRuleException("Treening pole veel alanud. Kohalolu saab märkida alates treeningu algusest.");
 
         booking.Attended = attended;
         await _uow.SaveChangesAsync(ct);
-        return booking.ToDto();
+        return booking.ToAttendanceDto();
     }
+
+    /// <summary>Mitmes on kirje ootejärjekorras (1 = esimene).</summary>
+    private async Task<int> PositionAsync(Booking entry, CancellationToken ct) =>
+        (await _bookings.GetWaitlistAsync(entry.SessionId, ct)).FindIndex(b => b.Id == entry.Id) + 1;
 }

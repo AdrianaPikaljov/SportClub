@@ -33,7 +33,7 @@ public class TokenService : ITokenService
 
     public TokenService(JwtOptions options) => _options = options;
 
-    public (string Token, DateTime ExpiresAt) CreateToken(User user)
+    public string CreateToken(User user)
     {
         var expires = DateTime.UtcNow.AddMinutes(_options.ExpiresMinutes);
         var descriptor = new SecurityTokenDescriptor
@@ -51,7 +51,7 @@ public class TokenService : ITokenService
             SigningCredentials = new SigningCredentials(
                 new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Key)), SecurityAlgorithms.HmacSha256)
         };
-        return (new JsonWebTokenHandler().CreateToken(descriptor), expires);
+        return new JsonWebTokenHandler().CreateToken(descriptor);
     }
 }
 
@@ -60,7 +60,7 @@ public static class ClaimsExtensions
     public static CurrentUser ToCurrentUser(this ClaimsPrincipal principal)
     {
         var id = int.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)
-                           ?? throw new UnauthorizedAccessException("Token ei sisalda kasutaja ID-d."));
+                           ?? throw new UnauthorizedAccessException("Token ei sisalda kasutaja id-d."));
         return new CurrentUser(id, principal.FindFirstValue(ClaimTypes.Role) ?? Roles.Client);
     }
 }

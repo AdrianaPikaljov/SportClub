@@ -1,45 +1,45 @@
 import { useEffect, useState } from 'react'
-import { api, hasToken, setToken } from './api.js'
+import { getSavedUser, setSession } from './api.js'
 import Login from './pages/Login.jsx'
 import Sessions from './pages/Sessions.jsx'
 import Trainers from './pages/Trainers.jsx'
 import TrainingTypes from './pages/TrainingTypes.jsx'
-import Passes from './pages/Passes.jsx'
 import PassPlans from './pages/PassPlans.jsx'
+import Bookings from './pages/Bookings.jsx'
+import Passes from './pages/Passes.jsx'
+import Users from './pages/Users.jsx'
 import Stats from './pages/Stats.jsx'
 
 const PAGES = [
   { id: 'sessions', label: 'Tunniplaan', component: Sessions },
   { id: 'trainers', label: 'Treenerid', component: Trainers },
   { id: 'types', label: 'Treeningutüübid', component: TrainingTypes },
-  { id: 'plans', label: 'Paketid', component: PassPlans },
+  { id: 'plans', label: 'Tariifid', component: PassPlans },
+  { id: 'bookings', label: 'Broneeringud', component: Bookings },
   { id: 'passes', label: 'Kuukaardid', component: Passes },
+  { id: 'users', label: 'Kasutajad', component: Users },
   { id: 'stats', label: 'Statistika', component: Stats }
 ]
 
 export default function App() {
-  const [user, setUser] = useState(null)
-  const [checking, setChecking] = useState(hasToken())
+  // Kasutaja (name, role) on salvestatud sisselogimisel; token aegumisel saadab API 401 → logout.
+  const [user, setUser] = useState(() => {
+    const saved = getSavedUser()
+    return saved?.role === 'Admin' ? saved : null
+  })
   const [page, setPage] = useState('sessions')
 
   useEffect(() => {
     const onLogout = () => setUser(null)
     window.addEventListener('logout', onLogout)
-    if (hasToken()) {
-      api('/api/auth/me')
-        .then((u) => (u.role === 'Admin' ? setUser(u) : logout()))
-        .catch(() => logout())
-        .finally(() => setChecking(false))
-    }
     return () => window.removeEventListener('logout', onLogout)
   }, [])
 
   function logout() {
-    setToken(null)
+    setSession(null)
     setUser(null)
   }
 
-  if (checking) return null
   if (!user) return <Login onLogin={setUser} />
 
   const Current = PAGES.find((p) => p.id === page).component
@@ -61,7 +61,7 @@ export default function App() {
           ))}
         </nav>
         <div className="sidebar-user">
-          <span>{user.fullName}</span>
+          <span>{user.name}</span>
           <button className="btn ghost small" onClick={logout}>Logi välja</button>
         </div>
       </aside>

@@ -5,11 +5,14 @@
              x:Class="SportClub.Maui.Views.BuyPassPage"
              x:DataType="vm:BuyPassViewModel"
              Title="Osta kuukaart"
+             Shell.NavBarIsVisible="False"
              BackgroundColor="{StaticResource Ground}">
 
     <Grid RowDefinitions="*,Auto">
         <ScrollView>
-            <VerticalStackLayout Padding="20,16,20,16" Spacing="12">
+            <VerticalStackLayout Padding="20,24,20,16" Spacing="12">
+                <Button Text="‹ Tagasi" Command="{Binding BackCommand}" HorizontalOptions="Start" BackgroundColor="{StaticResource Ink}"
+                        TextColor="{StaticResource Ground}" CornerRadius="12" HeightRequest="40" Padding="14,0" FontFamily="OpenSansSemibold" />
                 <Label Text="Vali pakett" Style="{StaticResource PageTitle}" />
                 <Label Text="Iga broneering kasutab ühe külastuse. Tühistamisel saad külastuse tagasi." FontSize="14" TextColor="{StaticResource Muted}" />
 

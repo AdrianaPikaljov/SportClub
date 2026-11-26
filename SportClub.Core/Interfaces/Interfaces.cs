@@ -3,7 +3,7 @@ using SportClub.Core.Entities;
 
 namespace SportClub.Core.Interfaces;
 
-/// <summary>Generic repository for simple CRUD.</summary>
+/// <summary>Üldine repository lihtsa CRUD-i jaoks.</summary>
 public interface IRepository<T> where T : class
 {
     Task<T?> GetByIdAsync(int id, CancellationToken ct = default);
@@ -11,6 +11,7 @@ public interface IRepository<T> where T : class
     void Remove(T entity);
 }
 
+/// <summary>Salvestab kõik muudatused korraga (DbContext).</summary>
 public interface IUnitOfWork
 {
     Task<int> SaveChangesAsync(CancellationToken ct = default);
@@ -19,92 +20,112 @@ public interface IUnitOfWork
 public interface IUserRepository : IRepository<User>
 {
     Task<User?> GetByEmailAsync(string email, CancellationToken ct = default);
-    Task<PagedResult<User>> SearchAsync(ListQuery query, string? role, CancellationToken ct = default);
+    Task<List<User>> SearchAsync(string? search, CancellationToken ct = default);
 }
 
 public interface ITrainerRepository : IRepository<Trainer>
 {
-    Task<PagedResult<Trainer>> SearchAsync(ListQuery query, CancellationToken ct = default);
+    /// <summary>Kõik treenerid koos kontoga (e-post).</summary>
+    Task<List<Trainer>> GetAllAsync(CancellationToken ct = default);
+    Task<Trainer?> GetWithUserAsync(int id, CancellationToken ct = default);
     Task<Trainer?> GetByUserIdAsync(int userId, CancellationToken ct = default);
-    Task<bool> HasSessionsAsync(int trainerId, CancellationToken ct = default);
+    Task<bool> HasSessionsAfterAsync(int trainerId, DateTime time, CancellationToken ct = default);
 }
 
 public interface ITrainingTypeRepository : IRepository<TrainingType>
 {
-    Task<PagedResult<TrainingType>> SearchAsync(ListQuery query, CancellationToken ct = default);
+    Task<List<TrainingType>> GetAllAsync(CancellationToken ct = default);
+    Task<TrainingType?> GetByNameAsync(string name, CancellationToken ct = default);
     Task<bool> NameExistsAsync(string name, int? exceptId, CancellationToken ct = default);
     Task<bool> HasSessionsAsync(int typeId, CancellationToken ct = default);
 }
 
 public interface ISessionRepository : IRepository<Session>
 {
-    /// <summary>Loads session with type and trainer.</summary>
+    /// <summary>Treening koos tüübi ja treeneriga.</summary>
     Task<Session?> GetDetailedAsync(int id, CancellationToken ct = default);
-    Task<PagedResult<Session>> SearchAsync(SessionQuery query, CancellationToken ct = default);
-    Task<int> CountActiveBookingsAsync(int sessionId, CancellationToken ct = default);
-    Task<int> CountWaitlistAsync(int sessionId, CancellationToken ct = default);
-    Task<Dictionary<int, (int Booked, int Waiting)>> GetCountsAsync(IEnumerable<int> sessionIds, CancellationToken ct = default);
-    Task<List<Session>> GetStartingBetweenAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
-    /// <summary>Future sessions that have people in the waitlist.</summary>
-    Task<List<Session>> GetUpcomingWithWaitlistAsync(DateTime nowUtc, CancellationToken ct = default);
+    /// <summary>Tunniplaan: from kaasa arvatud, to välja arvatud.</summary>
+    Task<List<Session>> GetListAsync(DateTime? from, DateTime? to, int? typeId, int? trainerId, bool newestFirst, CancellationToken ct = default);
+    /// <summary>Broneeritud, ootel olijate ja kohalolu märkimata inimeste arv iga treeningu kohta.</summary>
+    Task<Dictionary<int, SessionCounts>> GetCountsAsync(IEnumerable<int> sessionIds, CancellationToken ct = default);
+    Task<int> CountBookedAsync(int sessionId, CancellationToken ct = default);
+    /// <summary>Kas treeneril on sel ajal juba teine treening.</summary>
+    Task<bool> TrainerBusyAsync(int trainerId, DateTime start, DateTime end, int? exceptSessionId, CancellationToken ct = default);
+    Task<List<Session>> GetStartingBetweenAsync(DateTime from, DateTime to, CancellationToken ct = default);
+    /// <summary>Kõik treeningud, millel on keegi ootejärjekorras.</summary>
+    Task<List<Session>> GetWithWaitlistAsync(CancellationToken ct = default);
+    /// <summary>Kõik treeneri treeningud muutmiseks/kustutamiseks (jälgitavad, ilma seosteta).</summary>
+    Task<List<Session>> GetAllForTrainerAsync(int trainerId, CancellationToken ct = default);
 }
 
 public interface IBookingRepository : IRepository<Booking>
 {
-    Task<Booking?> GetWithSessionAsync(int id, CancellationToken ct = default);
-    Task<Booking?> GetActiveAsync(int sessionId, int userId, CancellationToken ct = default);
-    Task<List<Booking>> GetForUserAsync(int userId, bool upcomingOnly, DateTime nowUtc, CancellationToken ct = default);
-    Task<List<Booking>> GetActiveForSessionAsync(int sessionId, CancellationToken ct = default);
-    Task<List<Booking>> GetActiveWithoutReminderAsync(int sessionId, CancellationToken ct = default);
-    Task<List<PopularTrainingDto>> GetPopularAsync(DateTime? fromUtc, DateTime? toUtc, int top, CancellationToken ct = default);
-}
-
-public interface IWaitlistRepository : IRepository<WaitlistEntry>
-{
-    Task<WaitlistEntry?> GetAsync(int sessionId, int userId, CancellationToken ct = default);
-    Task<List<WaitlistEntry>> GetOrderedForSessionAsync(int sessionId, CancellationToken ct = default);
-    Task<List<WaitlistEntry>> GetForUserAsync(int userId, DateTime nowUtc, CancellationToken ct = default);
+    /// <summary>Broneering koos treeningu, kasutaja ja kuukaardiga.</summary>
+    Task<Booking?> GetDetailedAsync(int id, CancellationToken ct = default);
+    Task<Booking?> GetForUserAsync(int sessionId, int userId, CancellationToken ct = default);
+    Task<List<Booking>> GetAllForUserAsync(int userId, CancellationToken ct = default);
+    /// <summary>Kõik treeningu kirjed (Booked ja Waitlisted) koos kasutaja ja kuukaardiga.</summary>
+    Task<List<Booking>> GetForSessionAsync(int sessionId, CancellationToken ct = default);
+    /// <summary>Ootejärjekord õiges järjekorras (kes tuli varem, on eespool).</summary>
+    Task<List<Booking>> GetWaitlistAsync(int sessionId, CancellationToken ct = default);
+    Task<PagedResult<Booking>> SearchAsync(string? search, BookingStatus? status, BookingSort sort, int page, int pageSize, CancellationToken ct = default);
+    Task<List<Booking>> GetWithoutReminderAsync(int sessionId, CancellationToken ct = default);
+    /// <summary>Statistika jaoks: treeningud perioodis koos broneeritud ja kohal olnud inimeste arvuga.</summary>
+    Task<List<PopularDto>> GetPopularAsync(DateTime? from, DateTime? to, int? trainerId, CancellationToken ct = default);
 }
 
 public interface IMonthlyPassRepository : IRepository<MonthlyPass>
 {
-    /// <summary>The user's pass that is valid at the given time and still has visits left.</summary>
-    Task<MonthlyPass?> GetUsableAsync(int userId, DateTime atUtc, CancellationToken ct = default);
-    Task<List<MonthlyPass>> GetForUserAsync(int userId, CancellationToken ct = default);
-    Task<PagedResult<MonthlyPass>> SearchAsync(ListQuery query, CancellationToken ct = default);
-    /// <summary>Latest-ending pass of the user that still ends in the future (used to queue a new purchase after it).</summary>
-    Task<MonthlyPass?> GetLatestEndingAsync(int userId, DateTime nowUtc, CancellationToken ct = default);
-    Task<bool> HasUpcomingAsync(int userId, DateTime nowUtc, CancellationToken ct = default);
-    Task<bool> AnyForPlanAsync(int planId, CancellationToken ct = default);
+    /// <summary>Kuukaart, mis kehtib antud ajal ja millel on külastusi alles.</summary>
+    Task<MonthlyPass?> GetUsableAsync(int userId, DateTime time, CancellationToken ct = default);
+    Task<List<MonthlyPass>> SearchAsync(string? search, CancellationToken ct = default);
 }
 
 public interface IPassPlanRepository : IRepository<PassPlan>
 {
-    Task<PagedResult<PassPlan>> SearchAsync(ListQuery query, bool onlyActive, CancellationToken ct = default);
+    Task<List<PassPlan>> GetActiveAsync(CancellationToken ct = default);
 }
 
 public interface INotificationRepository : IRepository<Notification>
 {
-    Task<List<Notification>> GetForUserAsync(int userId, int take, CancellationToken ct = default);
 }
 
-/// <summary>Pushes realtime updates to connected clients (implemented with WebSockets in the API).</summary>
+/// <summary>Treeningu loendurid: broneeritud, ootel, kohalolu märkimata.</summary>
+public record SessionCounts(int Booked, int Waitlisted, int Unmarked);
+
+/// <summary>Saadab reaalajas uuendused (API-s WebSocketi kaudu).</summary>
 public interface ISessionNotifier
 {
     Task FreeSpotsChangedAsync(int sessionId, int free, CancellationToken ct = default);
 }
 
+/// <summary>Kell. Testides asendatakse mockiga.</summary>
 public interface IClock
 {
-    DateTime UtcNow { get; }
+    /// <summary>Praegune aeg klubi kohaliku aja järgi (Eesti aeg).</summary>
+    DateTime Now { get; }
 }
 
-public class SystemClock : IClock
+/// <summary>Eesti aeg (Europe/Tallinn), sõltumata serveri ajavööndist.</summary>
+public class ClubClock : IClock
 {
-    public DateTime UtcNow => DateTime.UtcNow;
+    private static readonly TimeZoneInfo Zone = FindZone();
+
+    public DateTime Now => DateTime.SpecifyKind(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, Zone), DateTimeKind.Unspecified);
+
+    private static TimeZoneInfo FindZone()
+    {
+        foreach (var id in new[] { "Europe/Tallinn", "FLE Standard Time" })
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById(id); }
+            catch (TimeZoneNotFoundException) { }
+            catch (InvalidTimeZoneException) { }
+        }
+        return TimeZoneInfo.Local;
+    }
 }
 
-/// <summary>Information about the logged-in user, passed from controllers to services.</summary>
+/// <summary>Sisseloginud kasutaja (kontrollerist teenusele).</summary>
 public record CurrentUser(int Id, string Role)
 {
     public bool IsAdmin => Role == Roles.Admin;

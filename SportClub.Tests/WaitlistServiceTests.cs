@@ -1,21 +1,18 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using SportClub.Core.Dtos;
 using SportClub.Core.Entities;
-using SportClub.Core.Exceptions;
 using SportClub.Core.Interfaces;
 using SportClub.Core.Services;
-using System.ComponentModel.DataAnnotations;
 
 namespace SportClub.Tests;
 
+/// <summary>Ootejärjekorrast kohale viimine (POST /api/waitlist/promote).</summary>
 public class WaitlistServiceTests
 {
-    private static readonly DateTime Now = new(2026, 11, 16, 8, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime Now = new(2026, 11, 26, 10, 0, 0);
 
     private readonly Mock<ISessionRepository> _sessions = new();
     private readonly Mock<IBookingRepository> _bookings = new();
-    private readonly Mock<IWaitlistRepository> _waitlist = new();
     private readonly Mock<IMonthlyPassRepository> _passes = new();
     private readonly Mock<INotificationRepository> _notifications = new();
     private readonly Mock<IUnitOfWork> _uow = new();
@@ -24,130 +21,85 @@ public class WaitlistServiceTests
 
     private readonly Session _session = new()
     {
-        Id = 20, StartsAt = Now.AddDays(1), MaxParticipants = 2, Room = "Rattasaal",
-        TrainingType = new TrainingType { Id = 3, Name = "Spinning" }
+        Id = 10, StartsAt = Now.AddDays(1), Capacity = 3, TrainingType = new TrainingType { Name = "Crossfit" }
     };
+
+    private readonly Booking _first;
+    private readonly Booking _second;
 
     public WaitlistServiceTests()
     {
-        _clock.Setup(c => c.UtcNow).Returns(Now);
-        _sessions.Setup(r => r.GetDetailedAsync(20, It.IsAny<CancellationToken>())).ReturnsAsync(_session);
+        _clock.Setup(c => c.Now).Returns(Now);
+        _sessions.Setup(r => r.GetWithWaitlistAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<Session> { _session });
+
+        _first = new Booking { Id = 21, SessionId = 10, UserId = 7, Status = BookingStatus.Waitlisted, CreatedAt = Now.AddHours(-3),
+            User = new User { Id = 7, FullName = "Liis Saar" } };
+        _second = new Booking { Id = 22, SessionId = 10, UserId = 8, Status = BookingStatus.Waitlisted, CreatedAt = Now.AddHours(-2),
+            User = new User { Id = 8, FullName = "Peeter Mets" } };
+        _bookings.Setup(r => r.GetWaitlistAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new List<Booking> { _first, _second });
     }
 
-    private WaitlistService CreateService() => new(_sessions.Object, _bookings.Object, _waitlist.Object, _passes.Object,
-        _notifications.Object, _uow.Object, _notifier.Object, _clock.Object, NullLogger<WaitlistService>.Instance);
+    private WaitlistService CreateService() => new(_sessions.Object, _bookings.Object, _passes.Object, _notifications.Object,
+        _uow.Object, _notifier.Object, _clock.Object, NullLogger<WaitlistService>.Instance);
 
-    private static MonthlyPass PassFor(int userId) =>
-        new() { Id = userId * 10, UserId = userId, ValidFrom = Now.AddDays(-1), ValidUntil = Now.AddDays(30), VisitsTotal = 12 };
-
-    [Fact]
-    public async Task Join_WhenSessionHasFreeSpots_ThrowsConflict()
-    {
-        _sessions.Setup(r => r.CountActiveBookingsAsync(20, It.IsAny<CancellationToken>())).ReturnsAsync(1);
-
-        var ex = await Assert.ThrowsAsync<ConflictException>(() => CreateService().JoinAsync(20, new CurrentUser(5, Roles.Client)));
-        Assert.Equal("Vabu kohti on", ex.Title);
-    }
+    private void SetBookedCount(int count) =>
+        _sessions.Setup(r => r.CountBookedAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(count);
 
     [Fact]
-    public async Task Join_WhenSessionIsFull_AddsEntryWithPosition()
+    public async Task Promote_WhenOneSpotIsFree_MovesOnlyTheFirstAndUsesVisit()
     {
-        _sessions.Setup(r => r.CountActiveBookingsAsync(20, It.IsAny<CancellationToken>())).ReturnsAsync(2);
-        _passes.Setup(r => r.GetUsableAsync(5, It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(PassFor(5));
-        WaitlistEntry? added = null;
-        _waitlist.Setup(r => r.AddAsync(It.IsAny<WaitlistEntry>(), It.IsAny<CancellationToken>()))
-                 .Callback<WaitlistEntry, CancellationToken>((e, _) => { e.Id = 77; added = e; });
-        _waitlist.Setup(r => r.GetOrderedForSessionAsync(20, It.IsAny<CancellationToken>()))
-                 .ReturnsAsync(() => new List<WaitlistEntry> { new() { Id = 70 }, added! });
-
-        var result = await CreateService().JoinAsync(20, new CurrentUser(5, Roles.Client));
-
-        Assert.Equal(2, result.Position);
-        Assert.Equal(77, result.Id);
-    }
-
-    [Fact]
-    public async Task Promote_GivesFreedSpotToFirstInQueue_FifoOrder()
-    {
-        _sessions.Setup(r => r.GetUpcomingWithWaitlistAsync(Now, It.IsAny<CancellationToken>())).ReturnsAsync(new List<Session> { _session });
-        _sessions.Setup(r => r.CountActiveBookingsAsync(20, It.IsAny<CancellationToken>())).ReturnsAsync(1); // 1 spot free
-        var first = new WaitlistEntry { Id = 1, SessionId = 20, UserId = 5, CreatedAt = Now.AddHours(-2) };
-        var second = new WaitlistEntry { Id = 2, SessionId = 20, UserId = 6, CreatedAt = Now.AddHours(-1) };
-        _waitlist.Setup(r => r.GetOrderedForSessionAsync(20, It.IsAny<CancellationToken>())).ReturnsAsync(new List<WaitlistEntry> { first, second });
-        var pass = PassFor(5);
-        _passes.Setup(r => r.GetUsableAsync(5, It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(pass);
+        SetBookedCount(2);
+        var pass = new MonthlyPass { Id = 3, UserId = 7, VisitsTotal = 8, VisitsUsed = 1 };
+        _passes.Setup(r => r.GetUsableAsync(7, _session.StartsAt, It.IsAny<CancellationToken>())).ReturnsAsync(pass);
 
         var result = await CreateService().PromoteAsync();
 
-        Assert.Equal(new PromoteResultDto(1, 0), result);
-        Assert.Equal(1, pass.VisitsUsed);
-        _bookings.Verify(r => r.AddAsync(It.Is<Booking>(b => b.UserId == 5 && b.SessionId == 20), It.IsAny<CancellationToken>()), Times.Once);
-        _bookings.Verify(r => r.AddAsync(It.Is<Booking>(b => b.UserId == 6), It.IsAny<CancellationToken>()), Times.Never);
-        _waitlist.Verify(r => r.Remove(first), Times.Once);
-        _waitlist.Verify(r => r.Remove(second), Times.Never);
-        _notifier.Verify(n => n.FreeSpotsChangedAsync(20, 0, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Single(result.Promoted);
+        Assert.Equal(21, result.Promoted[0].BookingId);
+        Assert.Equal(BookingStatus.Booked, _first.Status);
+        Assert.Equal(BookingStatus.Waitlisted, _second.Status);
+        Assert.Equal(2, pass.VisitsUsed);
+        _notifier.Verify(n => n.FreeSpotsChangedAsync(10, 0, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Promote_SkipsUserWithoutPassAndTakesNext()
+    public async Task Promote_WhenFirstHasNoPass_RemovesHimAndTakesNext()
     {
-        _sessions.Setup(r => r.GetUpcomingWithWaitlistAsync(Now, It.IsAny<CancellationToken>())).ReturnsAsync(new List<Session> { _session });
-        _sessions.Setup(r => r.CountActiveBookingsAsync(20, It.IsAny<CancellationToken>())).ReturnsAsync(1);
-        var noPass = new WaitlistEntry { Id = 1, SessionId = 20, UserId = 5 };
-        var hasPass = new WaitlistEntry { Id = 2, SessionId = 20, UserId = 6 };
-        _waitlist.Setup(r => r.GetOrderedForSessionAsync(20, It.IsAny<CancellationToken>())).ReturnsAsync(new List<WaitlistEntry> { noPass, hasPass });
-        _passes.Setup(r => r.GetUsableAsync(6, It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync(PassFor(6));
+        SetBookedCount(2);
+        _passes.Setup(r => r.GetUsableAsync(7, _session.StartsAt, It.IsAny<CancellationToken>())).ReturnsAsync((MonthlyPass?)null);
+        _passes.Setup(r => r.GetUsableAsync(8, _session.StartsAt, It.IsAny<CancellationToken>()))
+               .ReturnsAsync(new MonthlyPass { Id = 4, UserId = 8, VisitsTotal = 8 });
 
         var result = await CreateService().PromoteAsync();
 
-        Assert.Equal(new PromoteResultDto(1, 1), result);
-        _bookings.Verify(r => r.AddAsync(It.Is<Booking>(b => b.UserId == 6), It.IsAny<CancellationToken>()), Times.Once);
-    }
-}
-
-/// <summary>Tests without mocks: entity and DTO rules.</summary>
-public class ModelRuleTests
-{
-    [Fact]
-    public void MonthlyPass_VisitsLeftAndValidity()
-    {
-        var pass = new MonthlyPass
-        {
-            ValidFrom = new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc),
-            ValidUntil = new DateTime(2026, 11, 30, 23, 59, 59, DateTimeKind.Utc),
-            VisitsTotal = 12,
-            VisitsUsed = 5
-        };
-
-        Assert.Equal(7, pass.VisitsLeft);
-        Assert.True(pass.IsValidAt(new DateTime(2026, 11, 15, 0, 0, 0, DateTimeKind.Utc)));
-        Assert.False(pass.IsValidAt(new DateTime(2026, 12, 1, 0, 0, 0, DateTimeKind.Utc)));
+        _bookings.Verify(r => r.Remove(_first), Times.Once);
+        Assert.Equal(1, result.Removed);
+        Assert.Equal(22, Assert.Single(result.Promoted).BookingId);
+        Assert.Equal(BookingStatus.Booked, _second.Status);
     }
 
     [Fact]
-    public void SessionSaveDto_InPast_IsInvalid()
+    public async Task Promote_WhenSessionStartsWithinHour_RemovesWholeQueue()
     {
-        var dto = new SessionSaveDto
-        {
-            TrainingTypeId = 1, TrainerId = 1, StartsAt = DateTime.UtcNow.AddDays(-1), Room = "Saal 1", MaxParticipants = 10
-        };
-        var results = new List<ValidationResult>();
+        _session.StartsAt = Now.AddMinutes(45);
+        SetBookedCount(1);
 
-        var valid = Validator.TryValidateObject(dto, new ValidationContext(dto), results, validateAllProperties: true);
+        var result = await CreateService().PromoteAsync();
 
-        Assert.False(valid);
-        Assert.Contains(results, r => r.MemberNames.Contains(nameof(SessionSaveDto.StartsAt)));
+        Assert.Empty(result.Promoted);
+        Assert.Equal(2, result.Removed);
+        _bookings.Verify(r => r.Remove(It.IsAny<Booking>()), Times.Exactly(2));
     }
 
     [Fact]
-    public void MonthlyPassCreateDto_EndBeforeStart_IsInvalid()
+    public async Task Promote_WhenSessionIsFull_DoesNothing()
     {
-        var dto = new MonthlyPassCreateDto
-        {
-            UserId = 1, ValidFrom = new DateTime(2026, 12, 1), ValidUntil = new DateTime(2026, 11, 1), VisitsTotal = 12
-        };
-        var results = new List<ValidationResult>();
+        SetBookedCount(3);
 
-        Assert.False(Validator.TryValidateObject(dto, new ValidationContext(dto), results, true));
+        var result = await CreateService().PromoteAsync();
+
+        Assert.Empty(result.Promoted);
+        Assert.Equal(0, result.Removed);
+        _passes.Verify(r => r.GetUsableAsync(It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

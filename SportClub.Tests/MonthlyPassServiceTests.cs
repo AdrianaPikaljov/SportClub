@@ -6,71 +6,60 @@ using SportClub.Core.Services;
 
 namespace SportClub.Tests;
 
-/// <summary>Buying a monthly pass from a plan.</summary>
+/// <summary>Kuukaardi ostmine.</summary>
 public class MonthlyPassServiceTests
 {
-    private static readonly DateTime Now = new(2026, 11, 16, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime Now = new(2026, 11, 26, 10, 0, 0);
 
     private readonly Mock<IMonthlyPassRepository> _passes = new();
     private readonly Mock<IPassPlanRepository> _plans = new();
-    private readonly Mock<IUserRepository> _users = new();
-    private readonly Mock<INotificationRepository> _notifications = new();
     private readonly Mock<IUnitOfWork> _uow = new();
     private readonly Mock<IClock> _clock = new();
-    private readonly PassPlan _plan = new() { Id = 3, Name = "Kuukaart 12", Visits = 12, DurationDays = 30, Price = 49m, IsActive = true };
+    private readonly PassPlan _plan = new() { Id = 2, Name = "8 külastust", Visits = 8, Days = 30, Price = 39m, IsActive = true };
     private readonly CurrentUser _client = new(5, Roles.Client);
 
     public MonthlyPassServiceTests()
     {
-        _clock.Setup(c => c.UtcNow).Returns(Now);
-        _plans.Setup(r => r.GetByIdAsync(3, It.IsAny<CancellationToken>())).ReturnsAsync(_plan);
-        _users.Setup(r => r.GetByIdAsync(5, It.IsAny<CancellationToken>()))
-              .ReturnsAsync(new User { Id = 5, FullName = "Mari Tamm", Role = Roles.Client });
+        _clock.Setup(c => c.Now).Returns(Now);
+        _plans.Setup(r => r.GetByIdAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync(_plan);
     }
 
-    private MonthlyPassService CreateService() =>
-        new(_passes.Object, _plans.Object, _users.Object, _notifications.Object, _uow.Object, _clock.Object);
+    private MonthlyPassService CreateService() => new(_passes.Object, _plans.Object, _uow.Object, _clock.Object);
 
     [Fact]
-    public async Task Purchase_WithoutCurrentPass_StartsTodayWithPlanVisitsAndPrice()
+    public async Task Buy_WithoutActivePass_StartsTodayWithPlanVisits()
     {
-        var result = await CreateService().PurchaseAsync(3, _client);
+        var result = await CreateService().BuyAsync(2, _client);
 
-        Assert.Equal(Now, result.ValidFrom);
-        Assert.Equal(Now.AddDays(30), result.ValidUntil);
-        Assert.Equal(12, result.VisitsTotal);
-        Assert.Equal(49m, result.PricePaid);
-        Assert.True(result.IsActive);
-        _notifications.Verify(n => n.AddAsync(It.Is<Notification>(x => x.Type == "PassPurchased"), It.IsAny<CancellationToken>()), Times.Once);
-        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal("8 külastust", result.Plan);
+        Assert.Equal(8, result.VisitsLeft);
+        Assert.Equal("2026-11-26", result.ValidFrom);
+        Assert.Equal("2026-12-26", result.ValidUntil);
+        _passes.Verify(r => r.AddAsync(It.Is<MonthlyPass>(p => p.UserId == 5 && p.PricePaid == 39m), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Purchase_WhenCurrentPassHasVisits_StartsAfterCurrentEnds()
+    public async Task Buy_WhenActivePassExists_ThrowsConflict()
     {
-        var current = new MonthlyPass { ValidFrom = Now.AddDays(-10), ValidUntil = Now.AddDays(20), VisitsTotal = 12, VisitsUsed = 5 };
-        _passes.Setup(r => r.GetLatestEndingAsync(5, Now, It.IsAny<CancellationToken>())).ReturnsAsync(current);
+        _passes.Setup(r => r.GetUsableAsync(5, Now, It.IsAny<CancellationToken>()))
+               .ReturnsAsync(new MonthlyPass { Id = 1, UserId = 5, VisitsTotal = 8, VisitsUsed = 3 });
 
-        var result = await CreateService().PurchaseAsync(3, _client);
-
-        Assert.Equal(current.ValidUntil.AddSeconds(1), result.ValidFrom);
-        Assert.True(result.IsUpcoming);
-    }
-
-    [Fact]
-    public async Task Purchase_WhenNextPassAlreadyWaiting_ThrowsConflict()
-    {
-        _passes.Setup(r => r.HasUpcomingAsync(5, Now, It.IsAny<CancellationToken>())).ReturnsAsync(true);
-
-        await Assert.ThrowsAsync<ConflictException>(() => CreateService().PurchaseAsync(3, _client));
+        await Assert.ThrowsAsync<ConflictException>(() => CreateService().BuyAsync(2, _client));
         _passes.Verify(r => r.AddAsync(It.IsAny<MonthlyPass>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task Purchase_InactivePlan_ThrowsBusinessRule()
+    public async Task Buy_UnknownOrRemovedPlan_ThrowsNotFound()
     {
         _plan.IsActive = false;
 
-        await Assert.ThrowsAsync<BusinessRuleException>(() => CreateService().PurchaseAsync(3, _client));
+        await Assert.ThrowsAsync<NotFoundException>(() => CreateService().BuyAsync(2, _client));
+        await Assert.ThrowsAsync<NotFoundException>(() => CreateService().BuyAsync(99, _client));
+    }
+
+    [Fact]
+    public async Task GetMy_WithoutActivePass_ThrowsNotFound()
+    {
+        await Assert.ThrowsAsync<NotFoundException>(() => CreateService().GetMyAsync(5));
     }
 }

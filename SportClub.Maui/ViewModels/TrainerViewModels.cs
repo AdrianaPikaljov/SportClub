@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SportClub.Maui.Models;
 using SportClub.Maui.Services;
 
 namespace SportClub.Maui.ViewModels;
@@ -29,20 +30,28 @@ public partial class TrainerSessionsViewModel : BaseViewModel
     [ObservableProperty] private bool hasNext;
     [ObservableProperty] private string nextLabel = "";
 
-    public string Greeting => $"Tere, {_auth.User?.FullName.Split(' ')[0]}";
+    public string Greeting => $"Tere, {_auth.User?.Name.Split(' ')[0]}";
 
     [RelayCommand]
     private Task LoadAsync() => RunAsync(async () =>
     {
         OnPropertyChanged(nameof(Greeting));
-        var page = await _api.GetMyTrainerSessionsAsync();
-        var items = page.Items.Select(s => new SessionItem(s)).ToList();
+        // API annab kõik treeneri treeningud (uuemad eespool) koos staatusega.
+        var list = await _api.GetMyTrainerSessionsAsync();
+        var trainerName = _auth.User?.Name ?? "";
+        var items = list
+            .Select(t => new SessionItem(
+                new SessionDto(t.Id, t.Type, 0, trainerName, t.StartsAt, t.DurationMinutes, t.Capacity, t.Capacity - t.Booked),
+                t.Waitlisted > 0 ? $"{t.Status} · ootel {t.Waitlisted}" : t.Status))
+            .ToList();
 
-        Next = items.FirstOrDefault(s => s.Dto.StartsAt.AddMinutes(s.Dto.DurationMinutes) > DateTime.UtcNow);
+        // Järgmine = varaseim treening, mis pole veel lõppenud.
+        Next = items.Where(s => s.Dto.Start.AddMinutes(s.Dto.DurationMinutes) > DateTime.Now)
+                    .OrderBy(s => s.Dto.Start).FirstOrDefault();
         HasNext = Next is not null;
         if (Next is not null)
         {
-            var minutes = (int)(Next.Dto.StartsAt - DateTime.UtcNow).TotalMinutes;
+            var minutes = (int)(Next.Dto.Start - DateTime.Now).TotalMinutes;
             NextLabel = minutes <= 0 ? "Käimas" : minutes < 120 ? $"Järgmine · {minutes} min pärast" : $"Järgmine · {Next.Day}";
         }
 
@@ -78,7 +87,7 @@ public partial class AttendanceViewModel : BaseViewModel, IQueryAttributable
     [ObservableProperty] private bool isEmpty;
 
     public string Title => Session is null ? "" : $"{Session.Name} · {Session.Time}";
-    public string SubTitle => Session is null ? "" : $"{Session.Day} · {Session.Dto.Room}";
+    public string SubTitle => Session is null ? "" : $"{Session.Day} · {Session.Duration} · {Session.BookedText} osalejat";
 
     public void ApplyQueryAttributes(IDictionary<string, object> query)
     {
@@ -92,12 +101,15 @@ public partial class AttendanceViewModel : BaseViewModel, IQueryAttributable
     private Task LoadAsync() => RunAsync(async () =>
     {
         if (Session is null) return;
-        var list = await _api.GetParticipantsAsync(Session.Id);
+        var list = await _api.GetAttendanceAsync(Session.Id);
         Participants.Clear();
         foreach (var p in list) Participants.Add(new ParticipantItem(p));
         IsEmpty = Participants.Count == 0;
         Recount();
     });
+
+    [RelayCommand]
+    private Task BackAsync() => Shell.Current.GoToAsync("..");
 
     [RelayCommand]
     private Task MarkPresentAsync(ParticipantItem item) => MarkAsync(item, true);
@@ -151,8 +163,8 @@ public partial class StatsViewModel : BaseViewModel
     {
         DateTime? from = Period switch
         {
-            0 => DateTime.UtcNow.AddDays(-7),
-            1 => DateTime.UtcNow.AddMonths(-1),
+            0 => DateTime.Today.AddDays(-7),
+            1 => DateTime.Today.AddMonths(-1),
             _ => null
         };
         var rows = await _api.GetPopularAsync(from);
@@ -160,6 +172,6 @@ public partial class StatsViewModel : BaseViewModel
         Rows.Clear();
         for (var i = 0; i < rows.Count; i++) Rows.Add(new StatItem(i + 1, rows[i], max));
         TotalBookings = rows.Sum(r => r.Bookings);
-        AverageFill = rows.Count == 0 ? "0%" : $"{rows.Average(r => r.AverageFillPercent):0.#}%";
+        AverageFill = rows.Count == 0 ? "0%" : $"{rows.Average(r => r.FillRate):0.#}%";
     });
 }

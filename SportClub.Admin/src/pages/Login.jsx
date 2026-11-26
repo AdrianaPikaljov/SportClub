@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api, setToken } from '../api.js'
+import { api, setSession } from '../api.js'
 import { ErrorBox, Field } from '../components/ui.jsx'
 
 export default function Login({ onLogin }) {
@@ -21,12 +21,12 @@ export default function Login({ onLogin }) {
     setError('')
     try {
       const res = await api('/api/auth/login', { method: 'POST', body: { email, password } })
-      if (res.user.role !== 'Admin') {
+      if (res.role !== 'Admin') {
         setError('Admin-liidesesse saab siseneda ainult administraator.')
         return
       }
-      setToken(res.token)
-      onLogin(res.user)
+      setSession(res)
+      onLogin({ name: res.name, role: res.role })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -38,7 +38,7 @@ export default function Login({ onLogin }) {
     <div className="login">
       <form className="login-card" onSubmit={submit} noValidate>
         <h1>SportClub admin</h1>
-        <p className="muted">Halda treenereid, treeningutüüpe, tunniplaani ja kuukaarte.</p>
+        <p className="muted">Halda treenereid, treeningutüüpe, tunniplaani, tariife ja broneeringuid.</p>
         <ErrorBox error={error} />
         <Field label="E-post" error={errors.email}>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />

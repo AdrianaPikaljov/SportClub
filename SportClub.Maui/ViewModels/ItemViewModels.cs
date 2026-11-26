@@ -3,35 +3,40 @@ using SportClub.Maui.Models;
 
 namespace SportClub.Maui.ViewModels;
 
-/// <summary>One session card. FreeSpots changes live from the WebSocket.</summary>
+/// <summary>Üks treeningu kaart. FreeSpots uueneb WebSocketi kaudu reaalajas.</summary>
 public partial class SessionItem : ObservableObject
 {
-    public SessionItem(SessionDto dto)
+    public SessionItem(SessionDto dto, string status = "")
     {
         Dto = dto;
-        freeSpots = dto.FreeSpots;
+        freeSpots = dto.Free;
+        StatusText = status;
     }
 
     public SessionDto Dto { get; }
     public int Id => Dto.Id;
-    public string Name => Dto.TrainingTypeName;
-    public string Time => Dto.StartsAt.ToLocalTime().ToString("HH:mm");
-    public string Day => Dto.StartsAt.ToLocalTime().ToString("ddd, dd.MM");
+    public string Name => Dto.Type;
+    public string Trainer => Dto.Trainer;
+    public string Time => Dto.Start.ToString("HH:mm");
+    public string Day => Dto.Start.ToString("ddd, dd.MM");
     public string Duration => $"{Dto.DurationMinutes} min";
-    public string Subtitle => $"{Dto.TrainerName} · {Dto.Room}";
+    public string Subtitle => $"{Dto.Trainer} · {Dto.DurationMinutes} min";
+    public string CapacityText => $"{Dto.Capacity} kohta";
+    /// <summary>Treeneri vaates: "Tulemas", "Kohalolu märkimata" või "Kohalolu märgitud".</summary>
+    public string StatusText { get; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Badge), nameof(BadgeBackground), nameof(BadgeTextColor), nameof(IsFull), nameof(BookedText))]
     private int freeSpots;
 
     public bool IsFull => FreeSpots == 0;
-    public string BookedText => $"{Dto.MaxParticipants - FreeSpots}/{Dto.MaxParticipants}";
+    public string BookedText => $"{Dto.Capacity - FreeSpots}/{Dto.Capacity}";
 
     public string Badge => FreeSpots switch
     {
         0 => "Täis",
         <= 3 => $"{FreeSpots} vaba",
-        _ => $"{FreeSpots}/{Dto.MaxParticipants} vaba"
+        _ => $"{FreeSpots}/{Dto.Capacity} vaba"
     };
 
     public Color BadgeBackground => FreeSpots switch
@@ -67,13 +72,14 @@ public partial class DayItem : ObservableObject
 
 public partial class ChipItem : ObservableObject
 {
-    public ChipItem(int? id, string label)
+    /// <param name="type">Tüübi nimi API jaoks (null = kõik).</param>
+    public ChipItem(string? type, string label)
     {
-        Id = id;
+        Type = type;
         Label = label;
     }
 
-    public int? Id { get; }
+    public string? Type { get; }
     public string Label { get; }
 
     [ObservableProperty]
@@ -88,35 +94,36 @@ public class BookingItem
     public BookingItem(BookingDto dto) => Dto = dto;
 
     public BookingDto Dto { get; }
-    public string When => Dto.StartsAt.ToLocalTime().ToString("ddd, dd.MM · HH:mm");
-    public string Name => Dto.TrainingTypeName;
-    public string Subtitle => $"{Dto.TrainerName} · {Dto.Room}";
-    public bool IsCancelled => Dto.Status == "Cancelled";
-    public bool CanCancel => !IsCancelled && Dto.StartsAt > DateTime.UtcNow;
-    public string Tag => IsCancelled ? "Tühistatud" : Dto.Attended switch { true => "Kohal", false => "Puudus", _ => "Kinnitatud" };
+    public string When => Dto.Start.ToString("ddd, dd.MM · HH:mm");
+    public string Name => Dto.Type;
+    public string Subtitle => Dto.Trainer;
+    /// <summary>Tühistada saab kuni 2 tundi enne algust (API kontrollib sama reeglit).</summary>
+    public bool CanCancel => Dto.Start > DateTime.Now.AddHours(2);
+    public string Tag => Dto.Attended switch { true => "Kohal", false => "Puudus", _ => Dto.Start > DateTime.Now ? "Kinnitatud" : "Märkimata" };
 }
 
+/// <summary>Koht ootejärjekorras (sama BookingDto, status = Waitlisted).</summary>
 public class WaitlistItem
 {
-    public WaitlistItem(WaitlistEntryDto dto) => Dto = dto;
+    public WaitlistItem(BookingDto dto) => Dto = dto;
 
-    public WaitlistEntryDto Dto { get; }
-    public string When => Dto.StartsAt.ToLocalTime().ToString("ddd, dd.MM · HH:mm");
-    public string Name => Dto.TrainingTypeName;
+    public BookingDto Dto { get; }
+    public string When => Dto.Start.ToString("ddd, dd.MM · HH:mm");
+    public string Name => Dto.Type;
     public string Tag => $"Järjekorras #{Dto.Position}";
 }
 
 public partial class ParticipantItem : ObservableObject
 {
-    public ParticipantItem(ParticipantDto dto)
+    public ParticipantItem(AttendanceItemDto dto)
     {
         Dto = dto;
         attended = dto.Attended;
     }
 
-    public ParticipantDto Dto { get; }
-    public string Name => Dto.FullName;
-    public string Initials => string.Concat(Dto.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => w[0])).ToUpperInvariant();
+    public AttendanceItemDto Dto { get; }
+    public string Name => Dto.Name ?? "";
+    public string Initials => string.Concat(Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => w[0])).ToUpperInvariant();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PresentBackground), nameof(AbsentBackground), nameof(PresentTextColor), nameof(AbsentTextColor))]
@@ -130,7 +137,7 @@ public partial class ParticipantItem : ObservableObject
 
 public class StatItem
 {
-    public StatItem(int rank, PopularTrainingDto dto, int maxBookings)
+    public StatItem(int rank, PopularDto dto, int maxBookings)
     {
         Rank = rank;
         Dto = dto;
@@ -138,9 +145,9 @@ public class StatItem
     }
 
     public int Rank { get; }
-    public PopularTrainingDto Dto { get; }
-    public string Title => $"{Rank}. {Dto.Name}";
-    public string Detail => $"{Dto.Bookings} broneeringut · täituvus {Dto.AverageFillPercent}%";
+    public PopularDto Dto { get; }
+    public string Title => $"{Rank}. {Dto.Type}";
+    public string Detail => $"{Dto.Bookings} broneeringut · kohal {Dto.Attended} · täituvus {Dto.FillRate}%";
     public double Progress { get; }
     public Color BarColor => Rank == 1 ? Color.FromArgb("#14161A") : Color.FromArgb("#7A808A");
 }

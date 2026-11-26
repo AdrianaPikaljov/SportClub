@@ -1,6 +1,6 @@
 namespace SportClub.Worker;
 
-/// <summary>Every minute: moves the first person in the waitlist to a freed spot (POST /api/waitlist/promote).</summary>
+/// <summary>Iga minuti järel: viib järjekorras esimese vabanenud kohale (POST /api/waitlist/promote).</summary>
 public class WaitlistPromotionJob : BackgroundService
 {
     private readonly ApiClient _api;
@@ -22,10 +22,15 @@ public class WaitlistPromotionJob : BackgroundService
             try
             {
                 var result = await _api.PromoteWaitlistAsync(stoppingToken);
-                if (result is { Promoted: > 0 } or { Skipped: > 0 })
-                    _logger.LogInformation("Waitlist: {Promoted} promoted, {Skipped} skipped", result.Promoted, result.Skipped);
-                else
+                if (result is null || (result.Promoted.Count == 0 && result.Removed == 0))
                     _logger.LogDebug("Waitlist: nothing to do");
+                else
+                {
+                    foreach (var p in result.Promoted)
+                        _logger.LogInformation("Waitlist: {Name} → session {SessionId}", p.Name, p.SessionId);
+                    if (result.Removed > 0)
+                        _logger.LogInformation("Waitlist: {Removed} removed from queue", result.Removed);
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -35,7 +40,7 @@ public class WaitlistPromotionJob : BackgroundService
     }
 }
 
-/// <summary>Every 15 minutes: sends a reminder for sessions that start within the next hour.</summary>
+/// <summary>Iga 15 minuti järel: saadab meeldetuletuse treeningutele, mis algavad tunni jooksul.</summary>
 public class ReminderJob : BackgroundService
 {
     private readonly ApiClient _api;
@@ -57,11 +62,12 @@ public class ReminderJob : BackgroundService
             try
             {
                 var sessions = await _api.GetStartingSessionsAsync(_options.ReminderWithinMinutes, stoppingToken) ?? new();
-                foreach (var s in sessions.Where(s => s.PendingReminders > 0))
+                foreach (var s in sessions)
+                foreach (var p in s.Participants)
                 {
-                    var result = await _api.SendReminderAsync(s.SessionId, stoppingToken);
-                    _logger.LogInformation("Reminder: {Type} at {StartsAt:HH:mm} UTC → {Sent} sent",
-                        s.TrainingTypeName, s.StartsAt, result?.Sent ?? 0);
+                    var result = await _api.SendReminderAsync(p.BookingId, stoppingToken);
+                    if (result is not null)
+                        _logger.LogInformation("Reminder: {Type} {StartsAt} → {Name} ({Email})", s.Type, s.StartsAt, p.Name, p.Email);
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

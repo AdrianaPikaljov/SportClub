@@ -1,35 +1,63 @@
+using System.Globalization;
+
 namespace SportClub.Maui.Models;
 
-// Client-side copies of the API DTOs (the MAUI app does not reference the backend projects).
+// API DTO-de koopiad (mobiilirakendus ei viita backendi projektidele).
+// Ajad tulevad API-st Eesti aja järgi tekstina: "2026-11-27 18:00", kuupäevad "2026-11-27".
 
-public record UserDto(int Id, string FullName, string Email, string Role, int? TrainerId);
+public record LoginResponse(string Token, string Role, string Name);
 
-public record AuthResponse(string Token, DateTime ExpiresAt, UserDto User);
+public record UserDto(int Id, string Name, string Email, string Role);
 
-public record PagedResult<T>(List<T> Items, int Page, int PageSize, int TotalCount, int TotalPages);
+/// <summary>Sisseloginud kasutaja, mida rakendus enda juures hoiab.</summary>
+public record SignedInUser(string Name, string Email, string Role);
 
-public record TrainingTypeDto(int Id, string Name, string? Description, string Intensity);
+public record TrainingTypeDto(int Id, string Name, string? Description);
 
-public record SessionDto(
-    int Id, int TrainingTypeId, string TrainingTypeName, string Intensity, int TrainerId, string TrainerName,
-    DateTime StartsAt, int DurationMinutes, string Room, int MaxParticipants, int BookedCount, int FreeSpots, int WaitlistCount);
+public record SessionDto(int Id, string Type, int TrainerId, string Trainer, string StartsAt, int DurationMinutes, int Capacity, int Free)
+{
+    public DateTime Start => ApiTime.Parse(StartsAt);
+}
 
-public record BookingDto(int Id, int SessionId, string TrainingTypeName, string TrainerName, string Room,
-    DateTime StartsAt, string Status, bool? Attended, DateTime CreatedAt);
+public record TrainerSessionDto(int Id, string Type, string StartsAt, int DurationMinutes, int Capacity, int Booked, int Waitlisted, string Status)
+{
+    public DateTime Start => ApiTime.Parse(StartsAt);
+}
 
-public record WaitlistEntryDto(int Id, int SessionId, string TrainingTypeName, DateTime StartsAt, int Position, DateTime CreatedAt);
+/// <summary>status: Booked või Waitlisted. position = koht järjekorras.</summary>
+public record BookingDto(int Id, int SessionId, string Type, string Trainer, string StartsAt, string Status, int? Position, bool? Attended)
+{
+    public DateTime Start => ApiTime.Parse(StartsAt);
+}
 
-public record MonthlyPassDto(int Id, int UserId, string UserName, DateTime ValidFrom, DateTime ValidUntil,
-    int VisitsTotal, int VisitsUsed, int VisitsLeft, bool IsActive, string? PlanName, decimal? PricePaid, DateTime? PurchasedAt, bool IsUpcoming);
+public record MonthlyPassDto(int Id, string Plan, int VisitsLeft, int VisitsTotal, string ValidFrom, string ValidUntil)
+{
+    /// <summary>GET /api/passes/my tagastab ainult aktiivse kaardi.</summary>
+    public bool IsActive => VisitsLeft > 0;
+    public DateTime From => ApiTime.ParseDate(ValidFrom);
+    public DateTime Until => ApiTime.ParseDate(ValidUntil);
+}
 
-public record PassPlanDto(int Id, string Name, string? Description, int Visits, int DurationDays, decimal Price, bool IsActive);
+public record PassPlanDto(int Id, string Name, int Visits, int Days, decimal Price);
 
-public record ParticipantDto(int BookingId, int UserId, string FullName, string Email, bool? Attended);
+public record AttendanceItemDto(int BookingId, string? Name, bool? Attended);
 
-public record PopularTrainingDto(int TrainingTypeId, string Name, int Sessions, int Bookings, int Attended, double AverageFillPercent);
+public record PopularDto(string Type, int Sessions, int Bookings, int Attended, int FillRate);
 
-public record NotificationDto(int Id, int? SessionId, string Type, string Message, DateTime CreatedAt, bool IsRead);
-
-public record ProblemDetailsDto(string? Title, string? Detail, int? Status, Dictionary<string, string[]>? Errors);
+public record ProblemDetailsDto(string? Title, string? Detail, int? Status, Dictionary<string, string[]>? Errors, int? Position);
 
 public record FreeSpotsChangedMessage(string Type, int SessionId, int Free);
+
+/// <summary>Registreerumise tulemus: kas said koha või läksid ootejärjekorda.</summary>
+public record BookResult(bool Waitlisted, int? Position);
+
+public static class ApiTime
+{
+    public static DateTime Parse(string text) =>
+        DateTime.ParseExact(text, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+
+    public static DateTime ParseDate(string text) =>
+        DateTime.ParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    public static string Date(DateTime value) => value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+}

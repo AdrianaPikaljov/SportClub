@@ -39,7 +39,7 @@
                 <Label FontSize="14" TextColor="#B7BCC4">
                     <Label.FormattedText>
                         <FormattedString>
-                            <Span Text="{Binding Next.Dto.Room}" />
+                            <Span Text="{Binding Next.StatusText}" />
                             <Span Text=" · " />
                             <Span Text="{Binding Next.BookedText}" />
                             <Span Text=" osalejat" />
@@ -78,7 +78,7 @@
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
                                     <Label Text="{Binding Name}" FontSize="16" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ink}" />
-                                    <Label Text="{Binding Dto.Room}" FontSize="13" TextColor="{StaticResource Muted}" />
+                                    <Label Text="{Binding StatusText}" FontSize="13" TextColor="{StaticResource Muted}" />
                                 </VerticalStackLayout>
                                 <Label Grid.Column="2" Text="{Binding BookedText}" FontSize="14" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ink}" VerticalOptions="Center" />
                             </Grid>

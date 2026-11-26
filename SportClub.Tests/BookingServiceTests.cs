@@ -6,14 +6,13 @@ using SportClub.Core.Services;
 
 namespace SportClub.Tests;
 
-/// <summary>Unit tests for booking rules. Repositories are replaced with Moq mocks.</summary>
+/// <summary>Broneerimise reeglid. Repositoryd on asendatud Moq mockidega.</summary>
 public class BookingServiceTests
 {
-    private static readonly DateTime Now = new(2026, 11, 16, 8, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime Now = new(2026, 11, 26, 10, 0, 0);
 
     private readonly Mock<ISessionRepository> _sessions = new();
     private readonly Mock<IBookingRepository> _bookings = new();
-    private readonly Mock<IWaitlistRepository> _waitlist = new();
     private readonly Mock<IMonthlyPassRepository> _passes = new();
     private readonly Mock<ITrainerRepository> _trainers = new();
     private readonly Mock<IUnitOfWork> _uow = new();
@@ -25,31 +24,31 @@ public class BookingServiceTests
         Id = 10,
         TrainerId = 2,
         StartsAt = Now.AddDays(1),
-        MaxParticipants = 3,
-        Room = "Saal 1",
-        TrainingType = new TrainingType { Id = 2, Name = "HIIT" },
+        Capacity = 3,
+        TrainingType = new TrainingType { Id = 5, Name = "Crossfit" },
         Trainer = new Trainer { Id = 2, FullName = "Martin Kask" }
     };
 
     private readonly MonthlyPass _pass = new()
     {
-        Id = 1, UserId = 5, ValidFrom = Now.AddDays(-10), ValidUntil = Now.AddDays(20), VisitsTotal = 12, VisitsUsed = 4
+        Id = 1, UserId = 5, ValidFrom = Now.AddDays(-10), ValidUntil = Now.AddDays(20), VisitsTotal = 8, VisitsUsed = 2
     };
 
     private readonly CurrentUser _client = new(5, Roles.Client);
 
     public BookingServiceTests()
     {
-        _clock.Setup(c => c.UtcNow).Returns(Now);
+        _clock.Setup(c => c.Now).Returns(Now);
         _sessions.Setup(r => r.GetDetailedAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(_session);
         _passes.Setup(r => r.GetUsableAsync(5, _session.StartsAt, It.IsAny<CancellationToken>())).ReturnsAsync(_pass);
+        _bookings.Setup(r => r.GetWaitlistAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new List<Booking>());
     }
 
-    private BookingService CreateService() => new(_sessions.Object, _bookings.Object, _waitlist.Object, _passes.Object,
-        _trainers.Object, _uow.Object, _notifier.Object, _clock.Object);
+    private BookingService CreateService() => new(_sessions.Object, _bookings.Object, _passes.Object, _trainers.Object,
+        _uow.Object, _notifier.Object, _clock.Object);
 
     private void SetBookedCount(int count) =>
-        _sessions.Setup(r => r.CountActiveBookingsAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(count);
+        _sessions.Setup(r => r.CountBookedAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(count);
 
     [Fact]
     public async Task Book_WhenSpotIsFree_CreatesBookingAndUsesOneVisit()
@@ -58,127 +57,103 @@ public class BookingServiceTests
 
         var result = await CreateService().BookAsync(10, _client);
 
-        Assert.Equal(10, result.SessionId);
-        Assert.Equal("Active", result.Status);
-        Assert.Equal(5, _pass.VisitsUsed);
-        _bookings.Verify(r => r.AddAsync(It.Is<Booking>(b => b.UserId == 5 && b.MonthlyPassId == 1), It.IsAny<CancellationToken>()), Times.Once);
-        _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task Book_WhenSpotIsFree_SendsFreeSpotsChangedWithNewCount()
-    {
-        SetBookedCount(1);
-
-        await CreateService().BookAsync(10, _client);
-
-        // 3 places, 1 booked before, now 2 booked → 1 free
+        Assert.Equal("Booked", result.Status);
+        Assert.Null(result.Position);
+        Assert.Equal(3, _pass.VisitsUsed);
+        _bookings.Verify(r => r.AddAsync(It.Is<Booking>(b => b.UserId == 5 && b.MonthlyPassId == 1 && b.Status == BookingStatus.Booked),
+            It.IsAny<CancellationToken>()), Times.Once);
+        // 3 kohta, enne 1 broneeritud, nüüd 2 → 1 vaba
         _notifier.Verify(n => n.FreeSpotsChangedAsync(10, 1, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Book_WhenSessionIsFull_ThrowsSessionFullException()
+    public async Task Book_WhenSessionIsFull_AddsToWaitlistWithoutUsingVisit()
     {
         SetBookedCount(3);
+        _bookings.Setup(r => r.GetWaitlistAsync(10, It.IsAny<CancellationToken>()))
+                 .ReturnsAsync(() => new List<Booking> { new() { Id = 0, SessionId = 10, Status = BookingStatus.Waitlisted } });
 
-        var ex = await Assert.ThrowsAsync<SessionFullException>(() => CreateService().BookAsync(10, _client));
+        var result = await CreateService().BookAsync(10, _client);
 
-        Assert.Equal(409, ex.StatusCode);
-        _bookings.Verify(r => r.AddAsync(It.IsAny<Booking>(), It.IsAny<CancellationToken>()), Times.Never);
-        Assert.Equal(4, _pass.VisitsUsed);
+        Assert.Equal("Waitlisted", result.Status);
+        Assert.Equal(1, result.Position);
+        Assert.Equal(2, _pass.VisitsUsed); // külastust ei võetud
+        _bookings.Verify(r => r.AddAsync(It.Is<Booking>(b => b.Status == BookingStatus.Waitlisted && b.MonthlyPassId == null),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task Book_WhenAlreadyBooked_ThrowsConflict()
     {
-        SetBookedCount(1);
-        _bookings.Setup(r => r.GetActiveAsync(10, 5, It.IsAny<CancellationToken>())).ReturnsAsync(new Booking { Id = 1 });
+        _bookings.Setup(r => r.GetForUserAsync(10, 5, It.IsAny<CancellationToken>()))
+                 .ReturnsAsync(new Booking { Id = 3, SessionId = 10, UserId = 5, Status = BookingStatus.Booked });
 
         await Assert.ThrowsAsync<ConflictException>(() => CreateService().BookAsync(10, _client));
+        _bookings.Verify(r => r.AddAsync(It.IsAny<Booking>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task Book_WithoutUsablePass_ThrowsBusinessRule()
+    public async Task Book_WithoutPass_ThrowsBusinessRule()
     {
         SetBookedCount(0);
-        _passes.Setup(r => r.GetUsableAsync(5, It.IsAny<DateTime>(), It.IsAny<CancellationToken>())).ReturnsAsync((MonthlyPass?)null);
-
-        var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => CreateService().BookAsync(10, _client));
-        Assert.Equal(400, ex.StatusCode);
-    }
-
-    [Fact]
-    public async Task Book_WhenSessionAlreadyStarted_ThrowsBusinessRule()
-    {
-        _session.StartsAt = Now.AddMinutes(-5);
+        _passes.Setup(r => r.GetUsableAsync(5, _session.StartsAt, It.IsAny<CancellationToken>())).ReturnsAsync((MonthlyPass?)null);
 
         await Assert.ThrowsAsync<BusinessRuleException>(() => CreateService().BookAsync(10, _client));
     }
 
     [Fact]
-    public async Task Book_UnknownSession_ThrowsNotFound()
+    public async Task Book_PastSession_ThrowsBusinessRule()
     {
-        await Assert.ThrowsAsync<NotFoundException>(() => CreateService().BookAsync(999, _client));
+        _session.StartsAt = Now.AddHours(-1);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() => CreateService().BookAsync(10, _client));
     }
 
     [Fact]
-    public async Task Book_RemovesUserFromWaitlistOfSameSession()
+    public async Task Cancel_MoreThanTwoHoursBefore_GivesVisitBackAndDeletes()
     {
-        SetBookedCount(2);
-        var entry = new WaitlistEntry { Id = 7, SessionId = 10, UserId = 5 };
-        _waitlist.Setup(r => r.GetAsync(10, 5, It.IsAny<CancellationToken>())).ReturnsAsync(entry);
-
-        await CreateService().BookAsync(10, _client);
-
-        _waitlist.Verify(r => r.Remove(entry), Times.Once);
-    }
-
-    [Fact]
-    public async Task Cancel_ReturnsVisitToPassAndNotifies()
-    {
-        var booking = new Booking { Id = 3, SessionId = 10, Session = _session, UserId = 5, MonthlyPass = _pass };
-        _bookings.Setup(r => r.GetWithSessionAsync(3, It.IsAny<CancellationToken>())).ReturnsAsync(booking);
+        var booking = new Booking { Id = 7, SessionId = 10, Session = _session, UserId = 5, Status = BookingStatus.Booked, MonthlyPass = _pass };
+        _bookings.Setup(r => r.GetDetailedAsync(7, It.IsAny<CancellationToken>())).ReturnsAsync(booking);
         SetBookedCount(2);
 
-        await CreateService().CancelAsync(3, _client);
+        await CreateService().CancelAsync(7, _client);
 
-        Assert.Equal(BookingStatus.Cancelled, booking.Status);
-        Assert.Equal(3, _pass.VisitsUsed);
+        Assert.Equal(1, _pass.VisitsUsed);
+        _bookings.Verify(r => r.Remove(booking), Times.Once);
         _notifier.Verify(n => n.FreeSpotsChangedAsync(10, 1, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Cancel_LessThanTwoHoursBefore_ThrowsAndKeepsVisit()
+    {
+        _session.StartsAt = Now.AddMinutes(90);
+        var booking = new Booking { Id = 7, SessionId = 10, Session = _session, UserId = 5, Status = BookingStatus.Booked, MonthlyPass = _pass };
+        _bookings.Setup(r => r.GetDetailedAsync(7, It.IsAny<CancellationToken>())).ReturnsAsync(booking);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() => CreateService().CancelAsync(7, _client));
+        Assert.Equal(2, _pass.VisitsUsed);
+        _bookings.Verify(r => r.Remove(It.IsAny<Booking>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Cancel_WaitlistedLessThanTwoHoursBefore_IsAllowed()
+    {
+        _session.StartsAt = Now.AddMinutes(90);
+        var entry = new Booking { Id = 8, SessionId = 10, Session = _session, UserId = 5, Status = BookingStatus.Waitlisted };
+        _bookings.Setup(r => r.GetDetailedAsync(8, It.IsAny<CancellationToken>())).ReturnsAsync(entry);
+
+        await CreateService().CancelAsync(8, _client);
+
+        _bookings.Verify(r => r.Remove(entry), Times.Once);
+        Assert.Equal(2, _pass.VisitsUsed);
     }
 
     [Fact]
     public async Task Cancel_SomeoneElsesBooking_ThrowsForbidden()
     {
-        var booking = new Booking { Id = 3, SessionId = 10, Session = _session, UserId = 99 };
-        _bookings.Setup(r => r.GetWithSessionAsync(3, It.IsAny<CancellationToken>())).ReturnsAsync(booking);
+        var booking = new Booking { Id = 9, SessionId = 10, Session = _session, UserId = 99, Status = BookingStatus.Booked };
+        _bookings.Setup(r => r.GetDetailedAsync(9, It.IsAny<CancellationToken>())).ReturnsAsync(booking);
 
-        await Assert.ThrowsAsync<ForbiddenException>(() => CreateService().CancelAsync(3, _client));
-        Assert.Equal(BookingStatus.Active, booking.Status);
-    }
-
-    [Fact]
-    public async Task Attendance_ByTrainerOfAnotherSession_ThrowsForbidden()
-    {
-        _session.StartsAt = Now.AddMinutes(10);
-        var booking = new Booking { Id = 3, SessionId = 10, Session = _session, UserId = 5 };
-        _bookings.Setup(r => r.GetWithSessionAsync(3, It.IsAny<CancellationToken>())).ReturnsAsync(booking);
-        _trainers.Setup(r => r.GetByUserIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync(new Trainer { Id = 1 });
-
-        await Assert.ThrowsAsync<ForbiddenException>(() =>
-            CreateService().SetAttendanceAsync(3, true, new CurrentUser(42, Roles.Trainer)));
-    }
-
-    [Fact]
-    public async Task Attendance_ByOwnTrainer_SavesValue()
-    {
-        _session.StartsAt = Now.AddMinutes(10);
-        var booking = new Booking { Id = 3, SessionId = 10, Session = _session, UserId = 5 };
-        _bookings.Setup(r => r.GetWithSessionAsync(3, It.IsAny<CancellationToken>())).ReturnsAsync(booking);
-        _trainers.Setup(r => r.GetByUserIdAsync(42, It.IsAny<CancellationToken>())).ReturnsAsync(new Trainer { Id = 2 });
-
-        var result = await CreateService().SetAttendanceAsync(3, true, new CurrentUser(42, Roles.Trainer));
-
-        Assert.True(result.Attended);
+        await Assert.ThrowsAsync<ForbiddenException>(() => CreateService().CancelAsync(9, _client));
     }
 }

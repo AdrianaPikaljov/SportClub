@@ -5,10 +5,13 @@
              x:Class="SportClub.Maui.Views.AttendancePage"
              x:DataType="vm:AttendanceViewModel"
              Title="Kohalolu"
+             Shell.NavBarIsVisible="False"
              BackgroundColor="{StaticResource Ground}">
 
-    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="20,16,20,0" RowSpacing="14">
-        <VerticalStackLayout>
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="20,24,20,0" RowSpacing="14">
+        <VerticalStackLayout Spacing="12">
+            <Button Text="‹ Tagasi" Command="{Binding BackCommand}" HorizontalOptions="Start" BackgroundColor="{StaticResource Ink}"
+                TextColor="{StaticResource Ground}" CornerRadius="12" HeightRequest="40" Padding="14,0" FontFamily="OpenSansSemibold" />
             <Label Text="{Binding Title}" FontFamily="OpenSansSemibold" FontSize="24" TextColor="{StaticResource Ink}" />
             <Label Text="{Binding SubTitle}" FontSize="13" TextColor="{StaticResource Muted}" />
         </VerticalStackLayout>

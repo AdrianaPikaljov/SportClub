@@ -5,96 +5,150 @@ using SportClub.Core.Entities;
 namespace SportClub.Infrastructure.Data;
 
 /// <summary>
-/// Initial data. Static data (training types, trainers) goes into the migration with HasData.
-/// Users, passes and a two-week timetable relative to "today" are added on startup by <see cref="SeedRuntimeAsync"/>.
+/// Algandmed. Püsivad andmed (tüübid, tariifid, treenerid) lähevad migratsiooni HasData kaudu.
+/// Kasutajad, kuukaardid, tunniplaan ja broneeringud lisatakse käivitamisel (<see cref="SeedRuntimeAsync"/>),
+/// sest tunniplaan sõltub tänasest kuupäevast.
 /// </summary>
 public static class SeedData
 {
     public static void Configure(ModelBuilder b)
     {
         b.Entity<TrainingType>().HasData(
-            new TrainingType { Id = 1, Name = "Jooga", Intensity = "Madal", Description = "Rahulik venitus, tasakaal ja hingamine." },
-            new TrainingType { Id = 2, Name = "HIIT", Intensity = "Kõrge", Description = "Lühikesed intensiivsed intervallid ja pausid." },
-            new TrainingType { Id = 3, Name = "Spinning", Intensity = "Kõrge", Description = "Grupitreening velotrenažööridel muusika saatel." },
-            new TrainingType { Id = 4, Name = "Pilates", Intensity = "Keskmine", Description = "Kerelihaste tugevdamine ja rüht." },
-            new TrainingType { Id = 5, Name = "Crossfit", Intensity = "Kõrge", Description = "Funktsionaalne jõu- ja vastupidavustreening." });
+            new TrainingType { Id = 1, Name = "Jooga", Description = "Rahulik venitus, tasakaal ja hingamine." },
+            new TrainingType { Id = 2, Name = "HIIT", Description = "Lühikesed intensiivsed intervallid ja pausid." },
+            new TrainingType { Id = 3, Name = "Spinning", Description = "Grupitreening velotrenažööridel muusika saatel." },
+            new TrainingType { Id = 4, Name = "Pilates", Description = "Kerelihaste tugevdamine ja rüht." },
+            new TrainingType { Id = 5, Name = "Crossfit", Description = "Funktsionaalne jõu- ja vastupidavustreening." });
 
         b.Entity<PassPlan>().HasData(
-            new PassPlan { Id = 1, Name = "Proovikaart", Visits = 4, DurationDays = 30, Price = 25m, Description = "Sobib proovimiseks: 4 treeningut kuus." },
-            new PassPlan { Id = 2, Name = "Kuukaart 8", Visits = 8, DurationDays = 30, Price = 39m, Description = "Kaks treeningut nädalas." },
-            new PassPlan { Id = 3, Name = "Kuukaart 12", Visits = 12, DurationDays = 30, Price = 49m, Description = "Kõige populaarsem: kolm treeningut nädalas." },
-            new PassPlan { Id = 4, Name = "Kuukaart 20", Visits = 20, DurationDays = 30, Price = 69m, Description = "Neile, kes treenivad peaaegu iga päev." });
+            new PassPlan { Id = 1, Name = "4 külastust", Visits = 4, Days = 30, Price = 25m },
+            new PassPlan { Id = 2, Name = "8 külastust", Visits = 8, Days = 30, Price = 39m },
+            new PassPlan { Id = 3, Name = "12 külastust", Visits = 12, Days = 30, Price = 49m },
+            new PassPlan { Id = 4, Name = "20 külastust", Visits = 20, Days = 30, Price = 69m });
 
         b.Entity<Trainer>().HasData(
-            new Trainer { Id = 1, FullName = "Kertu Saar", Phone = "+372 5550 0001", Bio = "Joogaõpetaja, 8 aastat kogemust." },
-            new Trainer { Id = 2, FullName = "Martin Kask", Phone = "+372 5550 0002", Bio = "HIIT ja crossfit, endine kergejõustiklane." },
-            new Trainer { Id = 3, FullName = "Liis Mets", Phone = "+372 5550 0003", Bio = "Pilatese ja rühi treener." },
-            new Trainer { Id = 4, FullName = "Rasmus Ilves", Phone = "+372 5550 0004", Bio = "Spinningu treener ja jalgrattur." });
+            new Trainer { Id = 1, FullName = "Kertu Saar", Specialty = "Jooga", Description = "Joogaõpetaja, 8 aastat kogemust.", Phone = "+372 5550 0001" },
+            new Trainer { Id = 2, FullName = "Martin Kask", Specialty = "HIIT ja Crossfit", Description = "Endine kergejõustiklane.", Phone = "+372 5550 0002" },
+            new Trainer { Id = 3, FullName = "Liis Mets", Specialty = "Pilates", Description = "Pilatese ja rühi treener.", Phone = "+372 5550 0003" },
+            new Trainer { Id = 4, FullName = "Rasmus Ilves", Specialty = "Spinning", Description = "Spinningu treener ja jalgrattur.", Phone = "+372 5550 0004" });
     }
 
-    public static async Task SeedRuntimeAsync(AppDbContext db, DateTime nowUtc)
+    /// <summary>Lisab demoandmed, kui andmebaasis veel kasutajaid pole. now = Eesti aeg.</summary>
+    public static async Task SeedRuntimeAsync(AppDbContext db, DateTime now)
     {
         if (await db.Users.AnyAsync()) return;
 
         var hasher = new PasswordHasher<User>();
         User NewUser(string name, string email, string role, string password)
         {
-            var u = new User { FullName = name, Email = email, Role = role };
+            var u = new User { FullName = name, Email = email, Role = role, CreatedAt = now };
             u.PasswordHash = hasher.HashPassword(u, password);
             return u;
         }
 
+        // ----- Kasutajad -----
         var admin = NewUser("Admin Adminov", "admin@sportclub.ee", Roles.Admin, "Admin123!");
-        var service = NewUser("Taustateenus", "worker@sportclub.ee", Roles.Service, "Worker123!");
-        var trainerUser = NewUser("Martin Kask", "treener@sportclub.ee", Roles.Trainer, "Treener123!");
-        var client = NewUser("Mari Tamm", "klient@sportclub.ee", Roles.Client, "Klient123!");
-        var client2 = NewUser("Karl Lepp", "karl@sportclub.ee", Roles.Client, "Klient123!");
-        var client3 = NewUser("Anna Kivi", "anna@sportclub.ee", Roles.Client, "Klient123!");
-        db.Users.AddRange(admin, service, trainerUser, client, client2, client3);
+        var service = NewUser("Taustateenus", "service@sportclub.ee", Roles.Service, "Service123!");
+        var trainerUsers = new Dictionary<int, User>
+        {
+            [1] = NewUser("Kertu Saar", "kertu@sportclub.ee", Roles.Trainer, "Treener123!"),
+            [2] = NewUser("Martin Kask", "treener@sportclub.ee", Roles.Trainer, "Treener123!"),
+            [3] = NewUser("Liis Mets", "liis@sportclub.ee", Roles.Trainer, "Treener123!"),
+            [4] = NewUser("Rasmus Ilves", "rasmus@sportclub.ee", Roles.Trainer, "Treener123!")
+        };
+        var mari = NewUser("Mari Tamm", "klient@sportclub.ee", Roles.Client, "Klient123!");
+        var karl = NewUser("Karl Lepp", "karl@sportclub.ee", Roles.Client, "Klient123!");
+        var anna = NewUser("Anna Kivi", "anna@sportclub.ee", Roles.Client, "Klient123!");
+        var peeter = NewUser("Peeter Mets", "peeter@sportclub.ee", Roles.Client, "Klient123!");
+        var clients = new[] { mari, karl, anna, peeter };
+
+        db.Users.AddRange(admin, service);
+        db.Users.AddRange(trainerUsers.Values);
+        db.Users.AddRange(clients);
         await db.SaveChangesAsync();
 
-        // Link Martin Kask (trainer id 2) to the trainer login.
-        var martin = await db.Trainers.FirstAsync(t => t.Id == 2);
-        martin.UserId = trainerUser.Id;
+        // Iga treener saab oma sisselogimise konto.
+        foreach (var trainer in await db.Trainers.ToListAsync())
+            if (trainerUsers.TryGetValue(trainer.Id, out var user)) trainer.UserId = user.Id;
 
-        var monthStart = new DateTime(nowUtc.Year, nowUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        foreach (var c in new[] { client, client2, client3 })
+        // ----- Kuukaardid: ostetud 10 päeva tagasi, 20 külastust -----
+        var passes = clients.ToDictionary(c => c.Id, c => new MonthlyPass
         {
-            db.MonthlyPasses.Add(new MonthlyPass
+            UserId = c.Id,
+            PassPlanId = 4,
+            PlanName = "20 külastust",
+            PricePaid = 69m,
+            ValidFrom = now.Date.AddDays(-10),
+            ValidUntil = now.Date.AddDays(21).AddSeconds(-1),
+            VisitsTotal = 20
+        });
+        db.MonthlyPasses.AddRange(passes.Values);
+
+        // ----- Tunniplaan: eelmised 7 päeva ja järgmised 14 päeva (Eesti aeg) -----
+        var slots = new (int Hour, int Minute, int TypeId, int TrainerId, int Duration, int Capacity)[]
+        {
+            (7, 0, 1, 1, 60, 15),   // Jooga
+            (9, 30, 2, 2, 45, 12),  // HIIT
+            (12, 0, 4, 3, 50, 10),  // Pilates
+            (17, 30, 3, 4, 45, 20), // Spinning
+            (19, 0, 5, 2, 60, 3)    // Crossfit – ainult 3 kohta, et ootejärjekorda oleks lihtne näidata
+        };
+
+        var sessions = new List<(Session Session, int Day, int Slot)>();
+        for (var day = -7; day < 14; day++)
+        {
+            for (var i = 0; i < slots.Length; i++)
             {
-                UserId = c.Id,
-                ValidFrom = monthStart,
-                ValidUntil = monthStart.AddMonths(2).AddSeconds(-1), // valid this and next month, so demo bookings work
-                VisitsTotal = 12,
-                PassPlanId = 3,
-                PricePaid = 49m,
-                PurchasedAt = monthStart
+                var s = slots[i];
+                var session = new Session
+                {
+                    TrainingTypeId = s.TypeId,
+                    TrainerId = s.TrainerId,
+                    StartsAt = now.Date.AddDays(day).AddHours(s.Hour).AddMinutes(s.Minute),
+                    DurationMinutes = s.Duration,
+                    Capacity = s.Capacity
+                };
+                db.Sessions.Add(session);
+                sessions.Add((session, day, i));
+            }
+        }
+        await db.SaveChangesAsync();
+
+        // ----- Broneeringud -----
+        void Book(Session session, User client, bool? attended)
+        {
+            var pass = passes[client.Id];
+            pass.VisitsUsed++;
+            db.Bookings.Add(new Booking
+            {
+                SessionId = session.Id,
+                UserId = client.Id,
+                MonthlyPassId = pass.Id,
+                Status = BookingStatus.Booked,
+                CreatedAt = session.StartsAt.AddDays(-2),
+                Attended = attended,
+                ReminderSentAt = session.StartsAt < now ? session.StartsAt.AddHours(-1) : null
             });
         }
 
-        // Timetable for the next 14 days. Times are stored in UTC (Estonia is UTC+2 in winter).
-        var slots = new (int Hour, int Minute, int TypeId, int TrainerId, int Duration, string Room, int Max)[]
+        // Toimunud treeningud: vanematel on kohalolu märgitud, eilsel ja tänasel veel mitte.
+        foreach (var (session, day, slot) in sessions.Where(x => x.Session.StartsAt < now))
         {
-            (5, 0, 1, 1, 60, "Saal 2", 15),   // 07:00 Jooga
-            (7, 30, 2, 2, 45, "Saal 1", 12),  // 09:30 HIIT
-            (10, 0, 4, 3, 50, "Saal 2", 10),  // 12:00 Pilates
-            (15, 30, 3, 4, 45, "Rattasaal", 20), // 17:30 Spinning
-            (17, 0, 5, 2, 60, "Saal 1", 3)    // 19:00 Crossfit – small, easy to fill for the waitlist demo
-        };
-        var today = nowUtc.Date;
-        for (var d = 0; d < 14; d++)
-        {
-            foreach (var s in slots)
+            for (var c = 0; c < clients.Length; c++)
             {
-                var start = DateTime.SpecifyKind(today.AddDays(d).AddHours(s.Hour).AddMinutes(s.Minute), DateTimeKind.Utc);
-                if (start <= nowUtc) continue;
-                db.Sessions.Add(new Session
-                {
-                    TrainingTypeId = s.TypeId, TrainerId = s.TrainerId, StartsAt = start,
-                    DurationMinutes = s.Duration, Room = s.Room, MaxParticipants = s.Max
-                });
+                if ((day + 7 + slot + c) % 4 != 0) continue;
+                bool? attended = day < -1 ? (day + slot + c) % 5 != 0 : null;
+                Book(session, clients[c], attended);
             }
         }
+
+        // Homme kell 19:00 Crossfit on täis (Karl, Anna, Peeter) – Mari saab proovida ootejärjekorda.
+        var crossfit = sessions.First(x => x.Day == 1 && x.Slot == 4).Session;
+        foreach (var c in new[] { karl, anna, peeter }) Book(crossfit, c, null);
+
+        // Maril on üks tulevane broneering (ülehomme jooga).
+        Book(sessions.First(x => x.Day == 2 && x.Slot == 0).Session, mari, null);
+
         await db.SaveChangesAsync();
     }
 }
