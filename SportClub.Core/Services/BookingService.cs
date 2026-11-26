@@ -38,10 +38,14 @@ public class BookingService : IBookingService
     private readonly IUnitOfWork _uow;
     private readonly ISessionNotifier _notifier;
     private readonly IClock _clock;
+    private readonly IUserRepository _users;
+    private readonly IEmailSender _email;
 
     public BookingService(ISessionRepository sessions, IBookingRepository bookings, IMonthlyPassRepository passes,
-        ITrainerRepository trainers, IUnitOfWork uow, ISessionNotifier notifier, IClock clock)
+        ITrainerRepository trainers, IUnitOfWork uow, ISessionNotifier notifier, IClock clock, IUserRepository users, IEmailSender email)
     {
+        _users = users;
+        _email = email;
         _sessions = sessions;
         _bookings = bookings;
         _passes = passes;
@@ -67,6 +71,7 @@ public class BookingService : IBookingService
             await _bookings.AddAsync(booking, ct);
             await _uow.SaveChangesAsync(ct);
             await _notifier.FreeSpotsChangedAsync(sessionId, session.Capacity - (booked + 1), ct);
+            await SendAsync(user.Id, u => EmailTemplates.Booked(u, session), ct);
             return booking.ToDto(null);
         }
 
@@ -117,7 +122,18 @@ public class BookingService : IBookingService
         };
         await _bookings.AddAsync(entry, ct);
         await _uow.SaveChangesAsync(ct);
-        return (entry, await PositionAsync(entry, ct));
+        var position = await PositionAsync(entry, ct);
+        await SendAsync(user.Id, u => EmailTemplates.Waitlisted(u, session, position), ct);
+        return (entry, position);
+    }
+
+    /// <summary>Saadab kasutajale e-kirja (kui kasutaja on olemas).</summary>
+    private async Task SendAsync(int userId, Func<User, (string Subject, string Html)> build, CancellationToken ct)
+    {
+        var u = await _users.GetByIdAsync(userId, ct);
+        if (u is null) return;
+        var (subject, html) = build(u);
+        await _email.SendAsync(u.Email, u.FullName, subject, html, ct);
     }
 
     public async Task<List<BookingDto>> GetMyAsync(int userId, CancellationToken ct = default)

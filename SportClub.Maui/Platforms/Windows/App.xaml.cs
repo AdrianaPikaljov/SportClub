@@ -17,6 +17,23 @@ namespace SportClub.Maui.WinUI
         public App()
         {
             this.InitializeComponent();
+
+            // Viga ei sulge enam rakendust: see kirjutatakse crash.log faili ja näidatakse kasutajale.
+            UnhandledException += (_, e) =>
+            {
+                SportClub.Maui.Services.CrashLog.Write(e.Exception, "WinUI");
+                e.Handled = true;
+                var message = e.Exception?.Message ?? e.Message;
+                Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        if (Microsoft.Maui.Controls.Shell.Current is { } shell)
+                            await shell.DisplayAlertAsync("Viga / Error", message, "OK");
+                    }
+                    catch { /* ignore */ }
+                });
+            };
         }
 
         protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();

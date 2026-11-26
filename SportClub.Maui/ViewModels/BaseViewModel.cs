@@ -32,7 +32,7 @@ public abstract partial class BaseViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Ootamatu viga: {ex.Message}";
+            ErrorMessage = Loc.T("error.unexpected", ex.Message);
         }
         finally
         {
@@ -41,5 +41,25 @@ public abstract partial class BaseViewModel : ObservableObject
     }
 
     protected static Task ToastAsync(string title, string message) =>
-        Shell.Current.DisplayAlertAsync(title, message, "OK");
+        Shell.Current.DisplayAlertAsync(title, message, Loc.T("ok"));
+
+    /// <summary>
+    /// Turvaline "Tagasi": kui eelmist lehte pole, ei tehta midagi; viga ei sulge rakendust.
+    /// </summary>
+    protected async Task GoBackAsync()
+    {
+        try
+        {
+            if (Shell.Current.Navigation.NavigationStack.Count > 1)
+                await Shell.Current.GoToAsync("..");
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write(ex, "Back");
+            ErrorMessage = Loc.T("error.unexpected", ex.Message);
+        }
+    }
+
+    /// <summary>Kutsutakse pärast keele või teema vahetust, et koodis arvutatud tekstid ja värvid uueneksid.</summary>
+    public virtual void OnPreferencesChanged() { }
 }

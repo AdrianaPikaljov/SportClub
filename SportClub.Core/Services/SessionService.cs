@@ -32,10 +32,12 @@ public class SessionService : ISessionService
     private readonly IUnitOfWork _uow;
     private readonly ISessionNotifier _notifier;
     private readonly IClock _clock;
+    private readonly IEmailSender _email;
 
     public SessionService(ISessionRepository sessions, ITrainerRepository trainers, ITrainingTypeRepository types,
-        IBookingRepository bookings, IUnitOfWork uow, ISessionNotifier notifier, IClock clock)
+        IBookingRepository bookings, IUnitOfWork uow, ISessionNotifier notifier, IClock clock, IEmailSender email)
     {
+        _email = email;
         _sessions = sessions;
         _trainers = trainers;
         _types = types;
@@ -140,18 +142,28 @@ public class SessionService : ISessionService
     /// <summary>Kustutab treeningu. Kõik broneeringud tühistatakse ja külastused lähevad kuukaardile tagasi.</summary>
     public async Task DeleteAsync(int id, CancellationToken ct = default)
     {
-        var session = await _sessions.GetByIdAsync(id, ct) ?? throw new NotFoundException("Treening", id);
+        var session = await _sessions.GetDetailedAsync(id, ct) ?? throw new NotFoundException("Treening", id);
         var started = session.StartsAt <= _clock.Now;
 
+        var affected = new List<User>();
         foreach (var b in await _bookings.GetForSessionAsync(id, ct))
         {
             if (b.Status == BookingStatus.Booked && !started && b.MonthlyPass is { VisitsUsed: > 0 })
                 b.MonthlyPass.VisitsUsed--;
+            if (b.User is not null) affected.Add(b.User);
             _bookings.Remove(b);
         }
         _sessions.Remove(session);
         await _uow.SaveChangesAsync(ct);
         await _notifier.FreeSpotsChangedAsync(id, 0, ct);
+
+        // Tulevase treeningu tühistamisest teatame kõigile, kes olid kirjas või järjekorras.
+        if (!started)
+            foreach (var u in affected)
+            {
+                var (subject, html) = EmailTemplates.SessionCancelled(u, session);
+                await _email.SendAsync(u.Email, u.FullName, subject, html, ct);
+            }
     }
 
     /// <summary>Kontrollib andmeid ja tagastab algusaja.</summary>
@@ -186,7 +198,7 @@ public class SessionService : ISessionService
             var c = counts.TryGetValue(s.Id, out var x) ? x : new SessionCounts(0, 0, 0);
             var status = s.StartsAt > now ? "Tulemas" : c.Unmarked > 0 ? "Kohalolu märkimata" : "Kohalolu märgitud";
             return new TrainerSessionDto(s.Id, s.TrainingType?.Name ?? "", ClubTime.Format(s.StartsAt), s.DurationMinutes,
-                s.Capacity, c.Booked, c.Waitlisted, status);
+                s.Capacity, c.Booked, c.Waitlisted, c.Unmarked, status);
         }).ToList();
     }
 

@@ -12,6 +12,8 @@ using SportClub.Infrastructure;
 using SportClub.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+// Salajased seaded (nt e-posti parool) – fail ei lähe GitHubi (.gitignore).
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
 // ---------- Andmebaas ja teenused (DI) ----------
 builder.Services.AddInfrastructure(builder.Configuration.GetConnectionString("Default") ?? "Data Source=sportclub.db");
@@ -30,6 +32,11 @@ builder.Services.AddScoped<IMonthlyPassService, MonthlyPassService>();
 builder.Services.AddScoped<IPassPlanService, PassPlanService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IStatsService, StatsService>();
+
+// ---------- E-post ja makse ----------
+builder.Services.AddSingleton(builder.Configuration.GetSection("Email").Get<EmailOptions>() ?? new EmailOptions());
+builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+builder.Services.AddSingleton<IPaymentService, SimulatedPaymentService>();
 
 // ---------- JWT ----------
 var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();

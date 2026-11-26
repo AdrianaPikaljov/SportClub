@@ -174,20 +174,48 @@ public class PassPlanSaveDto
     public decimal Price { get; set; }
 }
 
+/// <summary>
+/// Kuukaardi ost koos kaardimaksega (simuleeritud). Kaardi andmeid ei salvestata –
+/// alles jäävad ainult kaardi tüüp ja 4 viimast numbrit.
+/// Testkaardid: 4242 4242 4242 4242 (õnnestub), 4000 0000 0000 0002 (lükatakse tagasi).
+/// </summary>
 public class BuyPassRequest
 {
     /// <summary>Tariifi id (vt GET /api/pass-plans).</summary>
     /// <example>2</example>
     [Range(1, int.MaxValue, ErrorMessage = "planId on kohustuslik.")]
     public int PlanId { get; set; }
+
+    /// <summary>Kaardi number (tühikud on lubatud).</summary>
+    /// <example>4242 4242 4242 4242</example>
+    [Required(ErrorMessage = "Kaardi number on kohustuslik.")]
+    [RegularExpression(@"^[0-9 ]{12,23}$", ErrorMessage = "Kaardi number peab koosnema numbritest.")]
+    public string CardNumber { get; set; } = "";
+
+    /// <summary>Kaardiomaniku nimi.</summary>
+    /// <example>Anna Kask</example>
+    [Required(ErrorMessage = "Kaardiomaniku nimi on kohustuslik."), StringLength(100, MinimumLength = 2)]
+    public string CardHolder { get; set; } = "";
+
+    /// <summary>Kehtivus kujul KK/AA.</summary>
+    /// <example>12/28</example>
+    [Required(ErrorMessage = "Kehtivus on kohustuslik.")]
+    [RegularExpression(@"^(0[1-9]|1[0-2])/[0-9]{2}$", ErrorMessage = "Kehtivus peab olema kujul KK/AA, nt 12/28.")]
+    public string Expiry { get; set; } = "";
+
+    /// <summary>Turvakood (3–4 numbrit).</summary>
+    /// <example>123</example>
+    [Required(ErrorMessage = "CVC on kohustuslik.")]
+    [RegularExpression(@"^[0-9]{3,4}$", ErrorMessage = "CVC peab olema 3–4 numbrit.")]
+    public string Cvc { get; set; } = "";
 }
 
-/// <summary>Kliendi enda kuukaart.</summary>
-public record MyPassDto(int Id, string Plan, int VisitsLeft, int VisitsTotal, string ValidFrom, string ValidUntil);
+/// <summary>Kliendi enda kuukaart. card = millega maksti, nt "Visa •••• 4242".</summary>
+public record MyPassDto(int Id, string Plan, int VisitsLeft, int VisitsTotal, string ValidFrom, string ValidUntil, string? Card);
 
 /// <summary>Kuukaart admini nimekirjas.</summary>
 public record PassDto(int Id, string Client, string Email, string Plan, int VisitsLeft, int VisitsTotal, string ValidFrom, string ValidUntil,
-    decimal PricePaid, bool Active);
+    decimal PricePaid, bool Active, string? Card);
 
 // ---------- Broneeringud ----------
 
@@ -214,8 +242,10 @@ public enum BookingSort
 
 /// <summary>
 /// Treeneri treening. status: "Tulemas" (pole alanud), "Kohalolu märkimata", "Kohalolu märgitud".
+/// unmarked = mitmel osalejal on kohalolu märkimata (attended = null).
 /// </summary>
-public record TrainerSessionDto(int Id, string Type, string StartsAt, int DurationMinutes, int Capacity, int Booked, int Waitlisted, string Status);
+public record TrainerSessionDto(int Id, string Type, string StartsAt, int DurationMinutes, int Capacity, int Booked, int Waitlisted,
+    int Unmarked, string Status);
 
 /// <summary>Üks rida osalejate nimekirjas.</summary>
 public class AttendanceItemDto

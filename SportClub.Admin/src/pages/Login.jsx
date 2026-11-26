@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { api, setSession } from '../api.js'
 import { ErrorBox, Field } from '../components/ui.jsx'
+import { PrefsSwitch, usePrefs } from '../i18n.jsx'
 
 export default function Login({ onLogin }) {
+  const { t } = usePrefs()
   const [email, setEmail] = useState('admin@sportclub.ee')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState({})
@@ -12,8 +14,8 @@ export default function Login({ onLogin }) {
   async function submit(e) {
     e.preventDefault()
     const v = {}
-    if (!/^\S+@\S+\.\S+$/.test(email)) v.email = 'Sisesta korrektne e-post.'
-    if (!password) v.password = 'Parool on kohustuslik.'
+    if (!/^\S+@\S+\.\S+$/.test(email)) v.email = t('login.badEmail')
+    if (!password) v.password = t('login.noPassword')
     setErrors(v)
     if (Object.keys(v).length) return
 
@@ -22,7 +24,7 @@ export default function Login({ onLogin }) {
     try {
       const res = await api('/api/auth/login', { method: 'POST', body: { email, password } })
       if (res.role !== 'Admin') {
-        setError('Admin-liidesesse saab siseneda ainult administraator.')
+        setError(t('login.notAdmin'))
         return
       }
       setSession(res)
@@ -37,16 +39,17 @@ export default function Login({ onLogin }) {
   return (
     <div className="login">
       <form className="login-card" onSubmit={submit} noValidate>
-        <h1>SportClub admin</h1>
-        <p className="muted">Halda treenereid, treeningutüüpe, tunniplaani, tariife ja broneeringuid.</p>
+        <PrefsSwitch />
+        <h1>{t('login.title')}</h1>
+        <p className="muted">{t('login.text')}</p>
         <ErrorBox error={error} />
-        <Field label="E-post" error={errors.email}>
+        <Field label={t('login.email')} error={errors.email}>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
         </Field>
-        <Field label="Parool" error={errors.password}>
+        <Field label={t('login.password')} error={errors.password}>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
-        <button className="btn primary" disabled={busy}>{busy ? 'Sisenen…' : 'Logi sisse'}</button>
+        <button className="btn primary" disabled={busy}>{busy ? t('login.busy') : t('login.submit')}</button>
       </form>
     </div>
   )

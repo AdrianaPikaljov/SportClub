@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getSavedUser, setSession } from './api.js'
+import { PrefsSwitch, usePrefs } from './i18n.jsx'
 import Login from './pages/Login.jsx'
 import Sessions from './pages/Sessions.jsx'
 import Trainers from './pages/Trainers.jsx'
@@ -11,17 +12,18 @@ import Users from './pages/Users.jsx'
 import Stats from './pages/Stats.jsx'
 
 const PAGES = [
-  { id: 'sessions', label: 'Tunniplaan', component: Sessions },
-  { id: 'trainers', label: 'Treenerid', component: Trainers },
-  { id: 'types', label: 'Treeningutüübid', component: TrainingTypes },
-  { id: 'plans', label: 'Tariifid', component: PassPlans },
-  { id: 'bookings', label: 'Broneeringud', component: Bookings },
-  { id: 'passes', label: 'Kuukaardid', component: Passes },
-  { id: 'users', label: 'Kasutajad', component: Users },
-  { id: 'stats', label: 'Statistika', component: Stats }
+  { id: 'sessions', component: Sessions },
+  { id: 'trainers', component: Trainers },
+  { id: 'types', component: TrainingTypes },
+  { id: 'plans', component: PassPlans },
+  { id: 'bookings', component: Bookings },
+  { id: 'passes', component: Passes },
+  { id: 'users', component: Users },
+  { id: 'stats', component: Stats }
 ]
 
 export default function App() {
+  const { t } = usePrefs()
   // Kasutaja (name, role) on salvestatud sisselogimisel; token aegumisel saadab API 401 → logout.
   const [user, setUser] = useState(() => {
     const saved = getSavedUser()
@@ -56,13 +58,14 @@ export default function App() {
         <nav>
           {PAGES.map((p) => (
             <button key={p.id} className={p.id === page ? 'nav-item active' : 'nav-item'} onClick={() => setPage(p.id)}>
-              {p.label}
+              {t(`nav.${p.id}`)}
             </button>
           ))}
         </nav>
         <div className="sidebar-user">
+          <PrefsSwitch />
           <span>{user.name}</span>
-          <button className="btn ghost small" onClick={logout}>Logi välja</button>
+          <button className="btn ghost small" onClick={logout}>{t('logout')}</button>
         </div>
       </aside>
       <main className="content">

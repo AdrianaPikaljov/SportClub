@@ -9,6 +9,7 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+        CrashLog.Init(); // käsitlemata vead → crash.log
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
@@ -41,6 +42,8 @@ public static class MauiProgram
         builder.Services.AddTransient<AttendancePage>();
         builder.Services.AddTransient<StatsViewModel>();
         builder.Services.AddTransient<StatsPage>();
+        builder.Services.AddTransient<SettingsViewModel>();
+        builder.Services.AddTransient<SettingsPage>();
         builder.Services.AddTransient<RegisterViewModel>();
         builder.Services.AddTransient<RegisterPage>();
         builder.Services.AddTransient<BuyPassViewModel>();

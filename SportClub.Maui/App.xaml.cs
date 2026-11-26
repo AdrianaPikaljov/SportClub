@@ -7,7 +7,9 @@ public partial class App : Application
     public App(IServiceProvider services)
     {
         InitializeComponent(); // loads Colors.xaml / AppStyles.xaml first
-        UserAppTheme = AppTheme.Light; // design is made for the light theme
+        // Salvestatud keel ja teema (vaikimisi eesti keel ja tume teema).
+        Services.Loc.Instance.Load();
+        Services.ThemeService.Load();
         _services = services;
     }
 

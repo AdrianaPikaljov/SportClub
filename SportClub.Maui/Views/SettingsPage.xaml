@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:loc="clr-namespace:SportClub.Maui.Services"
+             xmlns:vm="clr-namespace:SportClub.Maui.ViewModels"
+             x:Class="SportClub.Maui.Views.SettingsPage"
+             x:DataType="vm:SettingsViewModel"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{DynamicResource Ground}">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20,40,20,24" Spacing="14">
+            <Label Text="{loc:T settings.title}" Style="{StaticResource PageTitle}" />
+
+            <!-- Keel -->
+            <Label Text="{loc:T settings.language}" FontSize="13" FontFamily="OpenSansSemibold" TextColor="{DynamicResource Muted}" Margin="0,6,0,0" />
+            <Border Style="{StaticResource Card}" Padding="6">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                    <Button Text="Eesti keel" Command="{Binding SetLanguageCommand}" CommandParameter="et"
+                            BackgroundColor="{Binding EtBackground}" TextColor="{Binding EtText}" Style="{StaticResource TabButton}" HeightRequest="48" />
+                    <Button Grid.Column="1" Text="English" Command="{Binding SetLanguageCommand}" CommandParameter="en"
+                            BackgroundColor="{Binding EnBackground}" TextColor="{Binding EnText}" Style="{StaticResource TabButton}" HeightRequest="48" />
+                </Grid>
+            </Border>
+
+            <!-- Teema -->
+            <Label Text="{loc:T settings.theme}" FontSize="13" FontFamily="OpenSansSemibold" TextColor="{DynamicResource Muted}" Margin="0,6,0,0" />
+            <Border Style="{StaticResource Card}" Padding="6">
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="6">
+                    <Button Text="{loc:T settings.light}" Command="{Binding SetThemeCommand}" CommandParameter="light"
+                            BackgroundColor="{Binding LightBackground}" TextColor="{Binding LightText}" Style="{StaticResource TabButton}" HeightRequest="48" />
+                    <Button Grid.Column="1" Text="{loc:T settings.dark}" Command="{Binding SetThemeCommand}" CommandParameter="dark"
+                            BackgroundColor="{Binding DarkBackground}" TextColor="{Binding DarkText}" Style="{StaticResource TabButton}" HeightRequest="48" />
+                </Grid>
+            </Border>
+            <Label Text="{loc:T settings.hint}" FontSize="13" TextColor="{DynamicResource Muted}" />
+
+            <!-- Konto -->
+            <Label Text="{loc:T settings.account}" FontSize="13" FontFamily="OpenSansSemibold" TextColor="{DynamicResource Muted}" Margin="0,6,0,0" />
+            <Border Style="{StaticResource Card}" Padding="16,14">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                    <Border BackgroundColor="{DynamicResource Segment}" StrokeThickness="0" StrokeShape="Ellipse" WidthRequest="44" HeightRequest="44">
+                        <Label Text="{Binding Initials}" FontFamily="OpenSansSemibold" HorizontalOptions="Center" VerticalOptions="Center" TextColor="{DynamicResource Ink}" />
+                    </Border>
+                    <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                        <Label Text="{Binding UserName}" FontFamily="OpenSansSemibold" FontSize="15" TextColor="{DynamicResource Ink}" />
+                        <Label Text="{Binding UserEmail}" FontSize="13" TextColor="{DynamicResource Muted}" />
+                        <Label Text="{Binding RoleText}" FontSize="12" TextColor="{DynamicResource Muted}" />
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+            <Button Text="{loc:T logout}" Command="{Binding LogoutCommand}" Style="{StaticResource DangerButton}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

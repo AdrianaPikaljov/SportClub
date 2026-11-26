@@ -74,6 +74,9 @@ public class AppDbContext : DbContext, IUnitOfWork
             e.HasOne(x => x.User).WithMany(u => u.Passes).HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.PassPlan).WithMany().HasForeignKey(x => x.PassPlanId).OnDelete(DeleteBehavior.SetNull);
             e.Property(x => x.PlanName).HasMaxLength(60);
+            e.Property(x => x.CardBrand).HasMaxLength(20);
+            e.Property(x => x.CardLast4).HasMaxLength(4);
+            e.Property(x => x.PaymentReference).HasMaxLength(40);
             e.Property(x => x.PricePaid).HasConversion<double>();
             e.Ignore(x => x.VisitsLeft);
         });

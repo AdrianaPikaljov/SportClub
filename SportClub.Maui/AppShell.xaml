@@ -4,38 +4,45 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:views="clr-namespace:SportClub.Maui.Views"
+    xmlns:loc="clr-namespace:SportClub.Maui.Services"
     Title="SportClub"
-    Shell.TabBarBackgroundColor="White"
-    Shell.TabBarForegroundColor="{StaticResource Ink}"
-    Shell.TabBarTitleColor="{StaticResource Ink}"
-    Shell.TabBarUnselectedColor="{StaticResource Muted}"
-    Shell.BackgroundColor="{StaticResource Ink}"
-    Shell.ForegroundColor="{StaticResource Ground}"
-    Shell.TitleColor="{StaticResource Ground}">
+    Shell.TabBarBackgroundColor="{DynamicResource Surface}"
+    Shell.TabBarForegroundColor="{DynamicResource Ink}"
+    Shell.TabBarTitleColor="{DynamicResource Ink}"
+    Shell.TabBarUnselectedColor="{DynamicResource Muted}"
+    Shell.BackgroundColor="{DynamicResource Panel}"
+    Shell.ForegroundColor="{StaticResource OnPanel}"
+    Shell.TitleColor="{StaticResource OnPanel}">
 
     <!-- Login (no tabs) -->
     <ShellContent Route="login" ContentTemplate="{DataTemplate views:LoginPage}" Shell.FlyoutBehavior="Disabled" />
 
     <!-- Client tabs -->
     <TabBar Route="client">
-        <Tab Title="Tunniplaan" Icon="tab_schedule.png">
+        <Tab Title="{loc:T tab.schedule}" Icon="tab_schedule.png">
             <ShellContent Route="schedule" ContentTemplate="{DataTemplate views:SchedulePage}" />
         </Tab>
-        <Tab Title="Broneeringud" Icon="tab_bookings.png">
+        <Tab Title="{loc:T tab.bookings}" Icon="tab_bookings.png">
             <ShellContent Route="bookings" ContentTemplate="{DataTemplate views:BookingsPage}" />
         </Tab>
-        <Tab Title="Kuukaart" Icon="tab_card.png">
+        <Tab Title="{loc:T tab.pass}" Icon="tab_card.png">
             <ShellContent Route="pass" ContentTemplate="{DataTemplate views:PassPage}" />
+        </Tab>
+        <Tab Title="{loc:T tab.settings}" Icon="tab_settings.png">
+            <ShellContent Route="settings" ContentTemplate="{DataTemplate views:SettingsPage}" />
         </Tab>
     </TabBar>
 
     <!-- Trainer tabs -->
     <TabBar Route="trainer">
-        <Tab Title="Treeningud" Icon="tab_schedule.png">
+        <Tab Title="{loc:T tab.sessions}" Icon="tab_schedule.png">
             <ShellContent Route="sessions" ContentTemplate="{DataTemplate views:TrainerSessionsPage}" />
         </Tab>
-        <Tab Title="Statistika" Icon="tab_stats.png">
+        <Tab Title="{loc:T tab.stats}" Icon="tab_stats.png">
             <ShellContent Route="stats" ContentTemplate="{DataTemplate views:StatsPage}" />
+        </Tab>
+        <Tab Title="{loc:T tab.settings}" Icon="tab_settings.png">
+            <ShellContent Route="trainersettings" ContentTemplate="{DataTemplate views:SettingsPage}" />
         </Tab>
     </TabBar>
 </Shell>

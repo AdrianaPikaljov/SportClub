@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
+import { usePrefs } from '../i18n.jsx'
 
 export function Pager({ page, totalPages, total, onPage }) {
+  const { t } = usePrefs()
   if (!total) return null
   return (
     <div className="pager">
-      <span>Kokku {total}</span>
-      <button className="btn ghost small" disabled={page <= 1} onClick={() => onPage(page - 1)}>‹ Eelmine</button>
+      <span>{t('common.total', { n: total })}</span>
+      <button className="btn ghost small" disabled={page <= 1} onClick={() => onPage(page - 1)}>{t('pager.prev')}</button>
       <span>{page} / {Math.max(1, totalPages)}</span>
-      <button className="btn ghost small" disabled={page >= totalPages} onClick={() => onPage(page + 1)}>Järgmine ›</button>
+      <button className="btn ghost small" disabled={page >= totalPages} onClick={() => onPage(page + 1)}>{t('pager.next')}</button>
     </div>
   )
 }
@@ -23,7 +25,7 @@ export function Modal({ title, children, onClose }) {
       <div className="modal" role="dialog" aria-label={title} onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>{title}</h2>
-          <button className="btn ghost small" onClick={onClose} aria-label="Sulge">✕</button>
+          <button className="btn ghost small" onClick={onClose} aria-label="×">✕</button>
         </div>
         {children}
       </div>

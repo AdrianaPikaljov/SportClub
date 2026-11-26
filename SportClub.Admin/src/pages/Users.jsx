@@ -1,30 +1,31 @@
 import { useState } from 'react'
 import { api } from '../api.js'
 import { ErrorBox, useDebounced, useList } from '../components/ui.jsx'
+import { usePrefs } from '../i18n.jsx'
 
-const ROLES = { Admin: 'Admin', Trainer: 'Treener', Client: 'Klient', Service: 'Taustateenus' }
 
 /** Kõik kasutajad (GET /api/users?search=). */
 export default function Users() {
+  const { t } = usePrefs()
   const [searchText, setSearchText] = useState('')
   const search = useDebounced(searchText)
   const { items, error, loading } = useList(() => api('/api/users', { query: { search } }), [search])
 
   return (
     <section>
-      <header className="page-head"><h1>Kasutajad</h1></header>
+      <header className="page-head"><h1>{t('users.title')}</h1></header>
       <div className="filters">
-        <input placeholder="Otsi nime järgi" value={searchText} onChange={(e) => setSearchText(e.target.value)} />
+        <input placeholder={t('common.searchName')} value={searchText} onChange={(e) => setSearchText(e.target.value)} />
       </div>
       <ErrorBox error={error} />
       <div className="table-wrap">
         <table className={loading ? 'loading' : ''}>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Nimi</th>
-              <th>E-post</th>
-              <th>Roll</th>
+              <th>{t('common.id')}</th>
+              <th>{t('common.name')}</th>
+              <th>{t('users.email')}</th>
+              <th>{t('users.role')}</th>
             </tr>
           </thead>
           <tbody>
@@ -33,14 +34,14 @@ export default function Users() {
                 <td>{u.id}</td>
                 <td><strong>{u.name}</strong></td>
                 <td>{u.email}</td>
-                <td>{ROLES[u.role] || u.role}</td>
+                <td>{t(`role.${u.role}`)}</td>
               </tr>
             ))}
-            {!items.length && !loading && <tr><td colSpan="4" className="muted center">Kasutajaid ei leitud.</td></tr>}
+            {!items.length && !loading && <tr><td colSpan="4" className="muted center">{t('users.empty')}</td></tr>}
           </tbody>
         </table>
       </div>
-      <p className="muted">Kokku {items.length}</p>
+      <p className="muted">{t('common.total', { n: items.length })}</p>
     </section>
   )
 }

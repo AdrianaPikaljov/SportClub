@@ -1,26 +1,29 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:loc="clr-namespace:SportClub.Maui.Services"
              xmlns:vm="clr-namespace:SportClub.Maui.ViewModels"
              x:Class="SportClub.Maui.Views.BookingsPage"
              x:DataType="vm:BookingsViewModel"
              Shell.NavBarIsVisible="False"
-             BackgroundColor="{StaticResource Ground}">
+             BackgroundColor="{DynamicResource Ground}">
 
     <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="20,40,20,0" RowSpacing="14">
-        <Label Text="Broneeringud" Style="{StaticResource PageTitle}" />
+        <VerticalStackLayout Spacing="8">
+            <Label Text="{loc:T bookings.title}" Style="{StaticResource PageTitle}" />
+        </VerticalStackLayout>
 
         <!-- Segmented tabs -->
-        <Border Grid.Row="1" BackgroundColor="#E6E8E3" StrokeThickness="0" StrokeShape="RoundRectangle 14" Padding="4">
+        <Border Grid.Row="1" BackgroundColor="{DynamicResource Segment}" StrokeThickness="0" StrokeShape="RoundRectangle 14" Padding="4">
             <Grid ColumnDefinitions="*,*,*" ColumnSpacing="4">
-                <Button Text="Tulevased" Command="{Binding SelectTabCommand}" CommandParameter="0" BackgroundColor="{Binding Tab0Background}" Style="{StaticResource TabButton}" />
+                <Button Text="{loc:T bookings.upcoming}" Command="{Binding SelectTabCommand}" CommandParameter="0" BackgroundColor="{Binding Tab0Background}" Style="{StaticResource TabButton}" />
                 <Button Grid.Column="1" Text="{Binding WaitlistTitle}" Command="{Binding SelectTabCommand}" CommandParameter="1" BackgroundColor="{Binding Tab1Background}" Style="{StaticResource TabButton}" />
-                <Button Grid.Column="2" Text="Ajalugu" Command="{Binding SelectTabCommand}" CommandParameter="2" BackgroundColor="{Binding Tab2Background}" Style="{StaticResource TabButton}" />
+                <Button Grid.Column="2" Text="{loc:T bookings.history}" Command="{Binding SelectTabCommand}" CommandParameter="2" BackgroundColor="{Binding Tab2Background}" Style="{StaticResource TabButton}" />
             </Grid>
         </Border>
 
         <Border Grid.Row="2" BackgroundColor="{StaticResource Accent}" StrokeThickness="0" StrokeShape="RoundRectangle 14" Padding="14,12">
-            <Label Text="Meeldetuletus tuleb tund enne treeningut." FontSize="13" TextColor="{StaticResource Ink}" />
+            <Label Text="{loc:T bookings.reminder}" FontSize="13" TextColor="{StaticResource OnAccent}" />
         </Border>
 
         <RefreshView Grid.Row="3" Command="{Binding LoadCommand}" IsRefreshing="{Binding IsBusy}">
@@ -31,7 +34,7 @@
                         <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
                     </CollectionView.Header>
                     <CollectionView.EmptyView>
-                        <Label Text="Tulevasi broneeringuid pole." TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" Margin="0,40" />
+                        <Label Text="{loc:T bookings.noUpcoming}" TextColor="{DynamicResource Muted}" HorizontalTextAlignment="Center" Margin="0,40" />
                     </CollectionView.EmptyView>
                     <CollectionView.ItemsLayout>
                         <LinearItemsLayout Orientation="Vertical" ItemSpacing="12" />
@@ -42,15 +45,15 @@
                                 <VerticalStackLayout Spacing="12">
                                     <Grid ColumnDefinitions="*,Auto">
                                         <VerticalStackLayout Spacing="2">
-                                            <Label Text="{Binding When}" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{StaticResource Muted}" />
-                                            <Label Text="{Binding Name}" FontSize="17" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ink}" />
-                                            <Label Text="{Binding Subtitle}" FontSize="13" TextColor="{StaticResource Muted}" />
+                                            <Label Text="{Binding When}" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{DynamicResource Muted}" />
+                                            <Label Text="{Binding Name}" FontSize="17" FontFamily="OpenSansSemibold" TextColor="{DynamicResource Ink}" />
+                                            <Label Text="{Binding Subtitle}" FontSize="13" TextColor="{DynamicResource Muted}" />
                                         </VerticalStackLayout>
                                         <Border Grid.Column="1" Style="{StaticResource OkTag}">
-                                            <Label Text="{Binding Tag}" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{StaticResource OkText}" />
+                                            <Label Text="{Binding Tag}" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{DynamicResource OkText}" />
                                         </Border>
                                     </Grid>
-                                    <Button Text="Tühista" Style="{StaticResource DangerButton}" IsVisible="{Binding CanCancel}"
+                                    <Button Text="{loc:T bookings.cancel}" Style="{StaticResource DangerButton}" IsVisible="{Binding CanCancel}"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type vm:BookingsViewModel}}, Path=CancelCommand}"
                                             CommandParameter="{Binding .}" />
                                 </VerticalStackLayout>
@@ -62,7 +65,7 @@
                 <!-- Waitlist -->
                 <CollectionView ItemsSource="{Binding Waitlist}" IsVisible="{Binding ShowWaitlist}">
                     <CollectionView.EmptyView>
-                        <Label Text="Sa ei ole ühegi treeningu ootejärjekorras." TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" Margin="0,40" />
+                        <Label Text="{loc:T bookings.noWaitlist}" TextColor="{DynamicResource Muted}" HorizontalTextAlignment="Center" Margin="0,40" />
                     </CollectionView.EmptyView>
                     <CollectionView.ItemsLayout>
                         <LinearItemsLayout Orientation="Vertical" ItemSpacing="12" />
@@ -73,14 +76,14 @@
                                 <VerticalStackLayout Spacing="12">
                                     <Grid ColumnDefinitions="*,Auto">
                                         <VerticalStackLayout Spacing="2">
-                                            <Label Text="{Binding When}" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{StaticResource Muted}" />
-                                            <Label Text="{Binding Name}" FontSize="17" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ink}" />
+                                            <Label Text="{Binding When}" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{DynamicResource Muted}" />
+                                            <Label Text="{Binding Name}" FontSize="17" FontFamily="OpenSansSemibold" TextColor="{DynamicResource Ink}" />
                                         </VerticalStackLayout>
                                         <Border Grid.Column="1" Style="{StaticResource FewTag}">
-                                            <Label Text="{Binding Tag}" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{StaticResource FewText}" />
+                                            <Label Text="{Binding Tag}" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{DynamicResource FewText}" />
                                         </Border>
                                     </Grid>
-                                    <Button Text="Lahku järjekorrast" Style="{StaticResource DangerButton}"
+                                    <Button Text="{loc:T bookings.leave}" Style="{StaticResource DangerButton}"
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type vm:BookingsViewModel}}, Path=LeaveCommand}"
                                             CommandParameter="{Binding .}" />
                                 </VerticalStackLayout>
@@ -92,7 +95,7 @@
                 <!-- History -->
                 <CollectionView ItemsSource="{Binding History}" IsVisible="{Binding ShowHistory}">
                     <CollectionView.EmptyView>
-                        <Label Text="Ajalugu on tühi." TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" Margin="0,40" />
+                        <Label Text="{loc:T bookings.noHistory}" TextColor="{DynamicResource Muted}" HorizontalTextAlignment="Center" Margin="0,40" />
                     </CollectionView.EmptyView>
                     <CollectionView.ItemsLayout>
                         <LinearItemsLayout Orientation="Vertical" ItemSpacing="8" />
@@ -102,10 +105,10 @@
                             <Border Style="{StaticResource Card}" Padding="16,12">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <VerticalStackLayout>
-                                        <Label Text="{Binding Name}" FontSize="15" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ink}" />
-                                        <Label Text="{Binding When}" FontSize="12" TextColor="{StaticResource Muted}" />
+                                        <Label Text="{Binding Name}" FontSize="15" FontFamily="OpenSansSemibold" TextColor="{DynamicResource Ink}" />
+                                        <Label Text="{Binding When}" FontSize="12" TextColor="{DynamicResource Muted}" />
                                     </VerticalStackLayout>
-                                    <Label Grid.Column="1" Text="{Binding Tag}" FontSize="13" TextColor="{StaticResource Muted}" VerticalOptions="Center" />
+                                    <Label Grid.Column="1" Text="{Binding Tag}" FontSize="13" TextColor="{DynamicResource Muted}" VerticalOptions="Center" />
                                 </Grid>
                             </Border>
                         </DataTemplate>

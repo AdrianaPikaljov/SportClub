@@ -40,6 +40,13 @@ public class BusinessRuleException : AppException
     public override int StatusCode => 400;
 }
 
+/// <summary>402 – makse lükati tagasi (nt testkaart 4000 0000 0000 0002).</summary>
+public class PaymentDeclinedException : AppException
+{
+    public PaymentDeclinedException(string message) : base(message, "Makse ebaõnnestus") { }
+    public override int StatusCode => 402;
+}
+
 /// <summary>403 – pole õigust (nt teise kliendi broneering).</summary>
 public class ForbiddenException : AppException
 {

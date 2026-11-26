@@ -19,6 +19,10 @@
     <Color x:Key="Ground">#F4F5F2</Color>
     <Color x:Key="Line">#E3E5E0</Color>
     <Color x:Key="Accent">#D4FF3A</Color>
+    <!-- Alati samad (mõlemas teemas): tekst tumedal paneelil ja laimirohelisel taustal -->
+    <Color x:Key="OnPanel">#F4F5F2</Color>
+    <Color x:Key="OnAccent">#14161A</Color>
+    <!-- Teemast sõltuvad värvid (Surface, Panel, Segment …) seab ThemeService koodist. -->
     <Color x:Key="OkBg">#E1F4E7</Color>
     <Color x:Key="OkText">#17663A</Color>
     <Color x:Key="FewBg">#FFF1D6</Color>

@@ -18,6 +18,8 @@ public class BookingServiceTests
     private readonly Mock<IUnitOfWork> _uow = new();
     private readonly Mock<ISessionNotifier> _notifier = new();
     private readonly Mock<IClock> _clock = new();
+    private readonly Mock<IUserRepository> _users = new();
+    private readonly Mock<IEmailSender> _email = new();
 
     private readonly Session _session = new()
     {
@@ -45,7 +47,7 @@ public class BookingServiceTests
     }
 
     private BookingService CreateService() => new(_sessions.Object, _bookings.Object, _passes.Object, _trainers.Object,
-        _uow.Object, _notifier.Object, _clock.Object);
+        _uow.Object, _notifier.Object, _clock.Object, _users.Object, _email.Object);
 
     private void SetBookedCount(int count) =>
         _sessions.Setup(r => r.CountBookedAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(count);

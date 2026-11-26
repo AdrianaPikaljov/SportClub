@@ -133,7 +133,7 @@ public class SessionRepository : Repository<Session>, ISessionRepository
             .ToListAsync(ct);
 
     public Task<List<Session>> GetWithWaitlistAsync(CancellationToken ct = default) =>
-        Db.Sessions.Include(s => s.TrainingType)
+        Db.Sessions.Include(s => s.TrainingType).Include(s => s.Trainer)
             .Where(s => s.Bookings.Any(b => b.Status == BookingStatus.Waitlisted))
             .OrderBy(s => s.StartsAt)
             .ToListAsync(ct);

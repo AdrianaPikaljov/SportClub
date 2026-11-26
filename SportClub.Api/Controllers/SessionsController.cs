@@ -252,7 +252,7 @@ public class TrainerController : ControllerBase
     ///
     /// status:
     /// - **Tulemas** – pole veel alanud, märkida ei saa
-    /// - **Kohalolu märkimata** – toimunud, aga kõik pole märgitud
+    /// - **Kohalolu märkimata** – toimunud, aga kõik pole märgitud (**unmarked** = mitu inimest on märkimata)
     /// - **Kohalolu märgitud** – kõik märgitud (parandada saab ikka)
     ///
     /// from / to (AAAA-KK-PP) on valikuline filter.

@@ -50,11 +50,15 @@ public static class Mapping
         ClubTime.Format(b.CreatedAt));
 
     public static MyPassDto ToMyDto(this MonthlyPass p) => new(
-        p.Id, p.PlanName, p.VisitsLeft, p.VisitsTotal, ClubTime.FormatDate(p.ValidFrom), ClubTime.FormatDate(p.ValidUntil));
+        p.Id, p.PlanName, p.VisitsLeft, p.VisitsTotal, ClubTime.FormatDate(p.ValidFrom), ClubTime.FormatDate(p.ValidUntil), p.CardText());
 
     public static PassDto ToDto(this MonthlyPass p, DateTime now) => new(
         p.Id, p.User?.FullName ?? "", p.User?.Email ?? "", p.PlanName, p.VisitsLeft, p.VisitsTotal,
-        ClubTime.FormatDate(p.ValidFrom), ClubTime.FormatDate(p.ValidUntil), p.PricePaid, p.IsUsableAt(now));
+        ClubTime.FormatDate(p.ValidFrom), ClubTime.FormatDate(p.ValidUntil), p.PricePaid, p.IsUsableAt(now), p.CardText());
+
+    /// <summary>"Visa •••• 4242" või null, kui kaardiga ei makstud (nt algandmed).</summary>
+    public static string? CardText(this MonthlyPass p) =>
+        p.CardLast4 is null ? null : $"{p.CardBrand} •••• {p.CardLast4}";
 
     public static AttendanceItemDto ToAttendanceDto(this Booking b) =>
         new() { BookingId = b.Id, Name = b.User?.FullName ?? "", Attended = b.Attended };

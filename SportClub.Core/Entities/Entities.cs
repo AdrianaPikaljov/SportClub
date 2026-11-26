@@ -125,6 +125,10 @@ public class MonthlyPass
 
     public string PlanName { get; set; } = "";
     public decimal PricePaid { get; set; }
+    /// <summary>Makse andmed: ainult kaardi tüüp ja 4 viimast numbrit (kaarti ennast ei salvestata).</summary>
+    public string? CardBrand { get; set; }
+    public string? CardLast4 { get; set; }
+    public string? PaymentReference { get; set; }
     public DateTime ValidFrom { get; set; }
     public DateTime ValidUntil { get; set; }
     public int VisitsTotal { get; set; }

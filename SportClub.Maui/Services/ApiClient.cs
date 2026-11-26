@@ -67,8 +67,9 @@ public class ApiClient
         }
     }
 
-    public Task<MonthlyPassDto> BuyPassAsync(int planId) =>
-        SendAsync<MonthlyPassDto>(HttpMethod.Post, "api/passes", new { planId });
+    /// <summary>Kaardi andmed lähevad ainult API-sse (makse on simuleeritud) – rakendus neid ei salvesta.</summary>
+    public Task<MonthlyPassDto> BuyPassAsync(int planId, string cardNumber, string cardHolder, string expiry, string cvc) =>
+        SendAsync<MonthlyPassDto>(HttpMethod.Post, "api/passes", new { planId, cardNumber, cardHolder, expiry, cvc });
 
     /// <summary>Registreerumine. Täis treeningul vastab API 409 ja paneb kliendi ootejärjekorda.</summary>
     public async Task<BookResult> BookAsync(int sessionId)
@@ -96,6 +97,10 @@ public class ApiClient
     public Task<List<AttendanceItemDto>> GetAttendanceAsync(int sessionId) =>
         SendAsync<List<AttendanceItemDto>>(HttpMethod.Get, $"api/sessions/{sessionId}/attendance");
 
+    /// <summary>Märgib mitu osalejat korraga (PATCH /api/sessions/{id}/attendance).</summary>
+    public Task<List<AttendanceItemDto>> SaveAttendanceAsync(int sessionId, IEnumerable<AttendanceItemDto> items) =>
+        SendAsync<List<AttendanceItemDto>>(HttpMethod.Patch, $"api/sessions/{sessionId}/attendance", items.ToList());
+
     public Task SetAttendanceAsync(int bookingId, bool attended) =>
         SendAsync<object>(HttpMethod.Patch, $"api/bookings/{bookingId}/attendance", new { attended });
 
@@ -117,7 +122,7 @@ public class ApiClient
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
-            throw new ApiException(0, $"Serveriga ei saa ühendust ({ApiConfig.BaseUrl}). Kas API töötab?");
+            throw new ApiException(0, Loc.T("error.connection", ApiConfig.BaseUrl));
         }
 
         using (response)

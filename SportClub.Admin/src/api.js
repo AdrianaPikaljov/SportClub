@@ -1,4 +1,6 @@
 // All communication with the backend goes through the Web API.
+import { currentLang } from './i18n.jsx'
+
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:5080'
 
 let token = localStorage.getItem('token')
@@ -49,7 +51,10 @@ export async function api(path, { method = 'GET', body, query } = {}) {
     })
   } catch {
     // Võrguviga: API ei tööta või CORS blokeeris päringu.
-    throw new ApiError({ detail: `API-ga ei saa ühendust (${BASE}). Kas SportClub.Api töötab?` }, 0)
+    const detail = currentLang() === 'en'
+      ? `Cannot reach the API (${BASE}). Is SportClub.Api running?`
+      : `API-ga ei saa ühendust (${BASE}). Kas SportClub.Api töötab?`
+    throw new ApiError({ detail }, 0)
   }
   if (res.status === 401 && path !== '/api/auth/login') {
     setSession(null)
@@ -67,7 +72,7 @@ export function formatDateTime(text) {
   if (!text) return ''
   const [date, time] = text.split(' ')
   const [y, m, d] = date.split('-')
-  const weekday = new Date(Number(y), Number(m) - 1, Number(d)).toLocaleDateString('et-EE', { weekday: 'short' })
+  const weekday = new Date(Number(y), Number(m) - 1, Number(d)).toLocaleDateString(currentLang() === 'en' ? 'en-GB' : 'et-EE', { weekday: 'short' })
   return `${weekday} ${d}.${m}.${y}${time ? ' ' + time : ''}`
 }
 

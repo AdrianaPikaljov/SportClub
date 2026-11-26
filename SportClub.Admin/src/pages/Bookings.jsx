@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { api, formatDateTime } from '../api.js'
 import { ErrorBox, Pager, useDebounced, usePagedList } from '../components/ui.jsx'
+import { usePrefs } from '../i18n.jsx'
 
 /** Kõik broneeringud: otsing, filter, sorteerimine ja leheküljed (GET /api/bookings). */
 export default function Bookings() {
+  const { t } = usePrefs()
   const [searchText, setSearchText] = useState('')
   const [status, setStatus] = useState('')
   const [sort, setSort] = useState('Uusimad')
@@ -17,8 +19,8 @@ export default function Bookings() {
   )
 
   async function cancel(b) {
-    const what = b.status === 'Waitlisted' ? 'eemaldada ootejärjekorrast' : 'tühistada broneering'
-    if (!window.confirm(`${b.client}: ${what} (${b.type} ${formatDateTime(b.startsAt)})?`)) return
+    const vars = { client: b.client, training: `${b.type} ${formatDateTime(b.startsAt)}` }
+    if (!window.confirm(t(b.status === 'Waitlisted' ? 'bookings.confirmLeave' : 'bookings.confirmCancel', vars))) return
     try {
       await api(`/api/bookings/${b.id}`, { method: 'DELETE' })
       reload()
@@ -32,8 +34,8 @@ export default function Bookings() {
       const res = await api('/api/waitlist/promote', { method: 'POST' })
       const names = res.promoted.map((p) => p.name).join(', ')
       setInfo(res.promoted.length
-        ? `Järjekorrast viidi treeningule: ${names}.`
-        : 'Kedagi polnud järjekorrast viia.' + (res.removed ? ` Järjekorrast eemaldati ${res.removed}.` : ''))
+        ? t('bookings.promoted', { names })
+        : t('bookings.nobody') + (res.removed ? t('bookings.removed', { n: res.removed }) : ''))
       reload()
     } catch (e) {
       setInfo(e.message)
@@ -45,20 +47,20 @@ export default function Bookings() {
   return (
     <section>
       <header className="page-head">
-        <h1>Broneeringud</h1>
-        <button className="btn ghost" onClick={promote}>Vii järjekorrast kohtadele</button>
+        <h1>{t('bookings.title')}</h1>
+        <button className="btn ghost" onClick={promote}>{t('bookings.promote')}</button>
       </header>
       {info && <p className="muted">{info}</p>}
       <div className="filters">
-        <input placeholder="Otsi kliendi nime järgi" value={searchText} onChange={setFilter(setSearchText)} />
+        <input placeholder={t('common.searchClient')} value={searchText} onChange={setFilter(setSearchText)} />
         <select value={status} onChange={setFilter(setStatus)}>
-          <option value="">Kõik</option>
-          <option value="Booked">Registreeritud</option>
-          <option value="Waitlisted">Ootejärjekorras</option>
+          <option value="">{t('bookings.all')}</option>
+          <option value="Booked">{t('bookings.booked')}</option>
+          <option value="Waitlisted">{t('bookings.waitlisted')}</option>
         </select>
         <select value={sort} onChange={setFilter(setSort)}>
-          <option value="Uusimad">Uusimad enne</option>
-          <option value="Vanimad">Vanimad enne</option>
+          <option value="Uusimad">{t('bookings.newest')}</option>
+          <option value="Vanimad">{t('bookings.oldest')}</option>
         </select>
       </div>
       <ErrorBox error={error} />
@@ -66,12 +68,12 @@ export default function Bookings() {
         <table className={loading ? 'loading' : ''}>
           <thead>
             <tr>
-              <th>Klient</th>
-              <th>Treening</th>
-              <th>Aeg</th>
-              <th>Staatus</th>
-              <th>Kohalolu</th>
-              <th>Loodud</th>
+              <th>{t('bookings.client')}</th>
+              <th>{t('sessions.training')}</th>
+              <th>{t('sessions.time')}</th>
+              <th>{t('bookings.status')}</th>
+              <th>{t('bookings.attendance')}</th>
+              <th>{t('bookings.created')}</th>
               <th></th>
             </tr>
           </thead>
@@ -83,17 +85,17 @@ export default function Bookings() {
                 <td>{formatDateTime(b.startsAt)}</td>
                 <td>
                   {b.status === 'Booked'
-                    ? <span className="badge ok">Registreeritud</span>
-                    : <span className="badge few">Järjekorras #{b.position}</span>}
+                    ? <span className="badge ok">{t('bookings.booked')}</span>
+                    : <span className="badge few">{t('bookings.queue', { n: b.position })}</span>}
                 </td>
-                <td>{b.attended === true ? 'Kohal' : b.attended === false ? 'Puudus' : <span className="muted">–</span>}</td>
+                <td>{b.attended === true ? t('bookings.present') : b.attended === false ? t('bookings.absent') : <span className="muted">–</span>}</td>
                 <td className="muted">{formatDateTime(b.createdAt)}</td>
                 <td className="actions">
-                  <button className="btn danger small" onClick={() => cancel(b)}>Tühista</button>
+                  <button className="btn danger small" onClick={() => cancel(b)}>{t('bookings.cancel')}</button>
                 </td>
               </tr>
             ))}
-            {!data.items.length && !loading && <tr><td colSpan="7" className="muted center">Broneeringuid ei leitud.</td></tr>}
+            {!data.items.length && !loading && <tr><td colSpan="7" className="muted center">{t('bookings.empty')}</td></tr>}
           </tbody>
         </table>
       </div>

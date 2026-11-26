@@ -1,34 +1,35 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:loc="clr-namespace:SportClub.Maui.Services"
              xmlns:vm="clr-namespace:SportClub.Maui.ViewModels"
              xmlns:m="clr-namespace:SportClub.Maui.Models"
              x:Class="SportClub.Maui.Views.PassPage"
              x:DataType="vm:PassViewModel"
              Shell.NavBarIsVisible="False"
-             BackgroundColor="{StaticResource Ground}">
+             BackgroundColor="{DynamicResource Ground}">
 
     <RefreshView Command="{Binding LoadCommand}" IsRefreshing="{Binding IsBusy}">
         <ScrollView>
             <VerticalStackLayout Padding="20,40,20,24" Spacing="14">
-                <Label Text="Kuukaart" Style="{StaticResource PageTitle}" />
+                <Label Text="{loc:T pass.title}" Style="{StaticResource PageTitle}" />
                 <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
 
                 <!-- Pass card -->
-                <Border BackgroundColor="{StaticResource Ink}" StrokeThickness="0" StrokeShape="RoundRectangle 22" Padding="22" IsVisible="{Binding HasPass}">
+                <Border BackgroundColor="{DynamicResource Panel}" StrokeThickness="0" StrokeShape="RoundRectangle 22" Padding="22" IsVisible="{Binding HasPass}">
                     <VerticalStackLayout Spacing="16">
                         <Grid ColumnDefinitions="*,Auto">
                             <Label Text="{Binding MonthTitle}" FontSize="13" FontFamily="OpenSansSemibold" TextColor="#B7BCC4" VerticalOptions="Center" />
                             <Border Grid.Column="1" BackgroundColor="{StaticResource Accent}" StrokeThickness="0" StrokeShape="RoundRectangle 9" Padding="10,5"
                                     IsVisible="{Binding Pass.IsActive}">
-                                <Label Text="Aktiivne" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ink}" />
+                                <Label Text="{loc:T pass.active}" FontSize="12" FontFamily="OpenSansSemibold" TextColor="{StaticResource OnAccent}" />
                             </Border>
                         </Grid>
                         <Label>
                             <Label.FormattedText>
                                 <FormattedString>
-                                    <Span Text="{Binding Pass.VisitsLeft}" FontFamily="OpenSansSemibold" FontSize="56" TextColor="{StaticResource Ground}" />
-                                    <Span Text="{Binding Pass.VisitsTotal, StringFormat='  / {0} külastust alles'}" FontSize="16" TextColor="#B7BCC4" />
+                                    <Span Text="{Binding Pass.VisitsLeft}" FontFamily="OpenSansSemibold" FontSize="56" TextColor="{StaticResource OnPanel}" />
+                                    <Span Text="{Binding VisitsTotalText}" FontSize="16" TextColor="#B7BCC4" />
                                 </FormattedString>
                             </Label.FormattedText>
                         </Label>
@@ -38,44 +39,46 @@
                 </Border>
 
                 <Border Style="{StaticResource Card}" Padding="18" IsVisible="{Binding HasPass, Converter={StaticResource InvertBool}}">
-                    <Label Text="Sul pole veel kuukaarti. Osta kuukaart, et treeninguid broneerida." TextColor="{StaticResource Ink2}" />
+                    <Label Text="{loc:T pass.none}" TextColor="{DynamicResource Ink2}" />
                 </Border>
 
                 <Border Style="{StaticResource FewTag}" Padding="14,12" IsVisible="{Binding HasUpcoming}" VerticalOptions="Fill">
-                    <Label Text="{Binding UpcomingText}" FontSize="14" TextColor="{StaticResource FewText}" />
+                    <Label Text="{Binding UpcomingText}" FontSize="14" TextColor="{DynamicResource FewText}" />
                 </Border>
 
                 <Button Text="{Binding BuyButtonText}" Command="{Binding BuyPassCommand}" Style="{StaticResource AccentButton}"
                         IsVisible="{Binding HasUpcoming, Converter={StaticResource InvertBool}}" />
 
-                <Label Text="Viimased külastused" FontSize="13" FontFamily="OpenSansSemibold" TextColor="{StaticResource Muted}" Margin="0,4,0,0" />
+                <Label Text="{loc:T pass.visits}" FontSize="13" FontFamily="OpenSansSemibold" TextColor="{DynamicResource Muted}" Margin="0,4,0,0" />
                 <Border Style="{StaticResource Card}" Padding="0">
                     <VerticalStackLayout BindableLayout.ItemsSource="{Binding Visits}">
                         <BindableLayout.EmptyView>
-                            <Label Text="Külastusi veel pole." Padding="16,13" TextColor="{StaticResource Muted}" />
+                            <Label Text="{loc:T pass.noVisits}" Padding="16,13" TextColor="{DynamicResource Muted}" />
                         </BindableLayout.EmptyView>
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="vm:BookingItem">
                                 <Grid ColumnDefinitions="*,Auto" Padding="16,13">
-                                    <Label Text="{Binding Name}" FontFamily="OpenSansSemibold" FontSize="14" TextColor="{StaticResource Ink}" />
-                                    <Label Grid.Column="1" Text="{Binding When}" FontSize="13" TextColor="{StaticResource Muted}" />
+                                    <Label Text="{Binding Name}" FontFamily="OpenSansSemibold" FontSize="14" TextColor="{DynamicResource Ink}" />
+                                    <Label Grid.Column="1" Text="{Binding When}" FontSize="13" TextColor="{DynamicResource Muted}" />
                                 </Grid>
                             </DataTemplate>
                         </BindableLayout.ItemTemplate>
                     </VerticalStackLayout>
                 </Border>
 
+                <!-- Keel ja teema -->
+
                 <!-- Profile -->
                 <Border Style="{StaticResource Card}" Padding="16,14">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                        <Border BackgroundColor="#E6E8E3" StrokeThickness="0" StrokeShape="Ellipse" WidthRequest="44" HeightRequest="44">
-                            <Label Text="{Binding Initials}" FontFamily="OpenSansSemibold" HorizontalOptions="Center" VerticalOptions="Center" TextColor="{StaticResource Ink}" />
+                        <Border BackgroundColor="{DynamicResource Segment}" StrokeThickness="0" StrokeShape="Ellipse" WidthRequest="44" HeightRequest="44">
+                            <Label Text="{Binding Initials}" FontFamily="OpenSansSemibold" HorizontalOptions="Center" VerticalOptions="Center" TextColor="{DynamicResource Ink}" />
                         </Border>
                         <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
-                            <Label Text="{Binding UserName}" FontFamily="OpenSansSemibold" FontSize="15" TextColor="{StaticResource Ink}" />
-                            <Label Text="{Binding UserEmail}" FontSize="13" TextColor="{StaticResource Muted}" />
+                            <Label Text="{Binding UserName}" FontFamily="OpenSansSemibold" FontSize="15" TextColor="{DynamicResource Ink}" />
+                            <Label Text="{Binding UserEmail}" FontSize="13" TextColor="{DynamicResource Muted}" />
                         </VerticalStackLayout>
-                        <Button Grid.Column="2" Text="Logi välja" Command="{Binding LogoutCommand}" Style="{StaticResource OutlineButton}" />
+                        <Button Grid.Column="2" Text="{loc:T logout}" Command="{Binding LogoutCommand}" Style="{StaticResource OutlineButton}" />
                     </Grid>
                 </Border>
             </VerticalStackLayout>

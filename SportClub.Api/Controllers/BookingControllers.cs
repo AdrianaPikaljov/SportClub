@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SportClub.Api.Infrastructure;
 using SportClub.Core.Dtos;
 using SportClub.Core.Entities;
+using SportClub.Core.Interfaces;
 using SportClub.Core.Services;
 
 namespace SportClub.Api.Controllers;
@@ -113,12 +114,18 @@ public class PassesController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<MyPassDto>> My(CancellationToken ct) => Ok(await _service.GetMyAsync(User.ToCurrentUser().Id, ct));
 
-    /// <summary>Osta kuukaart</summary>
+    /// <summary>Osta kuukaart (kaardimakse)</summary>
     /// <remarks>
-    /// Kehas ainult tariifi id (vt GET /api/pass-plans). Kehtib tänasest. Makse on simuleeritud.
-    /// Korraga saab olla ainult üks aktiivne kuukaart.
+    /// Tariifi id (vt GET /api/pass-plans) ja kaardi andmed. Kuukaart kehtib tänasest, korraga saab olla ainult üks aktiivne.
+    ///
+    /// **Makse on simuleeritud** – raha ei liigu. Kaardi numbrit ja CVC-d **ei salvestata**,
+    /// alles jäävad ainult kaardi tüüp ja 4 viimast numbrit (nt "Visa •••• 4242"). Ostu kohta saadetakse kviitung e-postiga.
+    ///
+    /// Testkaardid: **4242 4242 4242 4242** – õnnestub · **4000 0000 0000 0002** – pank lükkab tagasi (402).
     /// </remarks>
     /// <response code="201">Ostetud.</response>
+    /// <response code="400">Vigane kaart (number, kehtivus või CVC).</response>
+    /// <response code="402">Pank lükkas makse tagasi.</response>
     /// <response code="404">Sellist tariifi pole.</response>
     /// <response code="409">Aktiivne kuukaart on juba olemas.</response>
     [HttpPost]
@@ -126,11 +133,13 @@ public class PassesController : ControllerBase
     [Tags(ApiTags.Client)]
     [ProducesResponseType<MyPassDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status402PaymentRequired)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<MyPassDto>> Buy(BuyPassRequest request, CancellationToken ct)
     {
-        var pass = await _service.BuyAsync(request.PlanId, User.ToCurrentUser(), ct);
+        var card = new CardDetails(request.CardNumber, request.CardHolder, request.Expiry, request.Cvc);
+        var pass = await _service.BuyAsync(request.PlanId, card, User.ToCurrentUser(), ct);
         return Created("/api/passes/my", pass);
     }
 

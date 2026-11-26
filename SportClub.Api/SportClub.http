@@ -84,12 +84,19 @@ POST {{host}}/api/sessions/1/bookings
 GET {{host}}/api/passes/my
 Authorization: Bearer {{clientToken}}
 
-### Osta kuukaart (aktiivne on juba olemas → 409)
+### Osta kuukaart kaardiga (simuleeritud makse; aktiivne on juba olemas → 409)
 POST {{host}}/api/passes
 Authorization: Bearer {{clientToken}}
 Content-Type: application/json
 
-{ "planId": 2 }
+{ "planId": 2, "cardNumber": "4242 4242 4242 4242", "cardHolder": "Karl Kask", "expiry": "12/28", "cvc": "123" }
+
+### Osta kuukaart – pank lükkab tagasi → 402
+POST {{host}}/api/passes
+Authorization: Bearer {{clientToken}}
+Content-Type: application/json
+
+{ "planId": 2, "cardNumber": "4000 0000 0000 0002", "cardHolder": "Karl Kask", "expiry": "12/28", "cvc": "123" }
 
 ### Registreeru treeningule (45 = homme 19:00 Crossfit, täis). Täis → 409 ja koht järjekorras
 POST {{host}}/api/sessions/45/bookings

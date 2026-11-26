@@ -19,7 +19,8 @@ public record SessionDto(int Id, string Type, int TrainerId, string Trainer, str
     public DateTime Start => ApiTime.Parse(StartsAt);
 }
 
-public record TrainerSessionDto(int Id, string Type, string StartsAt, int DurationMinutes, int Capacity, int Booked, int Waitlisted, string Status)
+public record TrainerSessionDto(int Id, string Type, string StartsAt, int DurationMinutes, int Capacity, int Booked, int Waitlisted,
+    int Unmarked, string Status)
 {
     public DateTime Start => ApiTime.Parse(StartsAt);
 }
@@ -30,7 +31,7 @@ public record BookingDto(int Id, int SessionId, string Type, string Trainer, str
     public DateTime Start => ApiTime.Parse(StartsAt);
 }
 
-public record MonthlyPassDto(int Id, string Plan, int VisitsLeft, int VisitsTotal, string ValidFrom, string ValidUntil)
+public record MonthlyPassDto(int Id, string Plan, int VisitsLeft, int VisitsTotal, string ValidFrom, string ValidUntil, string? Card = null)
 {
     /// <summary>GET /api/passes/my tagastab ainult aktiivse kaardi.</summary>
     public bool IsActive => VisitsLeft > 0;

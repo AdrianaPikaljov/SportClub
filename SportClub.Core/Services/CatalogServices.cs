@@ -283,9 +283,12 @@ public class AuthService : IAuthService
     private readonly ITokenService _tokens;
     private readonly IUnitOfWork _uow;
     private readonly IClock _clock;
+    private readonly IEmailSender _email;
 
-    public AuthService(IUserRepository users, IPasswordService passwords, ITokenService tokens, IUnitOfWork uow, IClock clock)
+    public AuthService(IUserRepository users, IPasswordService passwords, ITokenService tokens, IUnitOfWork uow, IClock clock,
+        IEmailSender email)
     {
+        _email = email;
         _users = users;
         _passwords = passwords;
         _tokens = tokens;
@@ -313,6 +316,9 @@ public class AuthService : IAuthService
         user.PasswordHash = _passwords.Hash(user, request.Password);
         await _users.AddAsync(user, ct);
         await _uow.SaveChangesAsync(ct);
+
+        var (subject, html) = EmailTemplates.Welcome(user);
+        await _email.SendAsync(user.Email, user.FullName, subject, html, ct);
         return user.ToDto();
     }
 

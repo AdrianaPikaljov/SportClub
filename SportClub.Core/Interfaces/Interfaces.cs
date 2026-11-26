@@ -90,6 +90,26 @@ public interface INotificationRepository : IRepository<Notification>
 {
 }
 
+/// <summary>
+/// Saadab e-kirja. Teostus on API-s (Gmail SMTP). Viga kirja saatmisel ei tohi äriloogikat katki teha.
+/// </summary>
+public interface IEmailSender
+{
+    Task SendAsync(string toEmail, string toName, string subject, string html, CancellationToken ct = default);
+}
+
+/// <summary>Maksekaardi andmed. Neid ei salvestata kuhugi – kasutatakse ainult makse kontrolliks.</summary>
+public record CardDetails(string Number, string Holder, string Expiry, string Cvc);
+
+/// <summary>Makse tulemus: salvestatakse ainult kaardi tüüp, 4 viimast numbrit ja makse viide.</summary>
+public record PaymentResult(string Reference, string Brand, string Last4);
+
+/// <summary>Makse (selles projektis simuleeritud, päris raha ei liigu).</summary>
+public interface IPaymentService
+{
+    PaymentResult Charge(CardDetails card, decimal amount);
+}
+
 /// <summary>Treeningu loendurid: broneeritud, ootel, kohalolu märkimata.</summary>
 public record SessionCounts(int Booked, int Waitlisted, int Unmarked);
 

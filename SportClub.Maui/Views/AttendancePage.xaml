@@ -1,68 +1,74 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:loc="clr-namespace:SportClub.Maui.Services"
              xmlns:vm="clr-namespace:SportClub.Maui.ViewModels"
              x:Class="SportClub.Maui.Views.AttendancePage"
              x:DataType="vm:AttendanceViewModel"
              Title="Kohalolu"
              Shell.NavBarIsVisible="False"
-             BackgroundColor="{StaticResource Ground}">
+             BackgroundColor="{DynamicResource Ground}">
 
     <Grid RowDefinitions="Auto,Auto,Auto,*" Padding="20,24,20,0" RowSpacing="14">
         <VerticalStackLayout Spacing="12">
-            <Button Text="‹ Tagasi" Command="{Binding BackCommand}" HorizontalOptions="Start" BackgroundColor="{StaticResource Ink}"
-                TextColor="{StaticResource Ground}" CornerRadius="12" HeightRequest="40" Padding="14,0" FontFamily="OpenSansSemibold" />
-            <Label Text="{Binding Title}" FontFamily="OpenSansSemibold" FontSize="24" TextColor="{StaticResource Ink}" />
-            <Label Text="{Binding SubTitle}" FontSize="13" TextColor="{StaticResource Muted}" />
+            <Button Text="{loc:T back}" Command="{Binding BackCommand}" HorizontalOptions="Start" BackgroundColor="{DynamicResource Panel}"
+                TextColor="{StaticResource OnPanel}" CornerRadius="12" HeightRequest="40" Padding="14,0" FontFamily="OpenSansSemibold" />
+            <Label Text="{Binding Title}" FontFamily="OpenSansSemibold" FontSize="24" TextColor="{DynamicResource Ink}" />
+            <Label Text="{Binding SubTitle}" FontSize="13" TextColor="{DynamicResource Muted}" />
         </VerticalStackLayout>
 
         <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="8">
             <Border Style="{StaticResource Card}" Padding="12,10">
                 <VerticalStackLayout>
-                    <Label Text="{Binding Present}" FontFamily="OpenSansSemibold" FontSize="22" TextColor="{StaticResource Ink}" />
-                    <Label Text="Kohal" FontSize="12" TextColor="{StaticResource Muted}" />
+                    <Label Text="{Binding Present}" FontFamily="OpenSansSemibold" FontSize="22" TextColor="{DynamicResource Ink}" />
+                    <Label Text="{loc:T att.present}" FontSize="12" TextColor="{DynamicResource Muted}" />
                 </VerticalStackLayout>
             </Border>
             <Border Grid.Column="1" Style="{StaticResource Card}" Padding="12,10">
                 <VerticalStackLayout>
-                    <Label Text="{Binding Absent}" FontFamily="OpenSansSemibold" FontSize="22" TextColor="{StaticResource Ink}" />
-                    <Label Text="Puudus" FontSize="12" TextColor="{StaticResource Muted}" />
+                    <Label Text="{Binding Absent}" FontFamily="OpenSansSemibold" FontSize="22" TextColor="{DynamicResource Ink}" />
+                    <Label Text="{loc:T att.absent}" FontSize="12" TextColor="{DynamicResource Muted}" />
                 </VerticalStackLayout>
             </Border>
             <Border Grid.Column="2" Style="{StaticResource Card}" Padding="12,10">
                 <VerticalStackLayout>
-                    <Label Text="{Binding Unmarked}" FontFamily="OpenSansSemibold" FontSize="22" TextColor="{StaticResource Ink}" />
-                    <Label Text="Märkimata" FontSize="12" TextColor="{StaticResource Muted}" />
+                    <Label Text="{Binding Unmarked}" FontFamily="OpenSansSemibold" FontSize="22" TextColor="{DynamicResource Ink}" />
+                    <Label Text="{loc:T att.unmarked}" FontSize="12" TextColor="{DynamicResource Muted}" />
                 </VerticalStackLayout>
             </Border>
         </Grid>
 
-        <Label Grid.Row="2" Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+        <VerticalStackLayout Grid.Row="2" Spacing="10">
+            <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+            <!-- Kõik peavad olema märgitud: märkimata read on punased, selle nupuga saab ülejäänud korraga märkida -->
+            <Button Text="{loc:T att.markRest}" Command="{Binding MarkRestPresentCommand}" IsVisible="{Binding HasUnmarked}"
+                    Style="{StaticResource AccentButton}" HeightRequest="48" FontSize="15" />
+        </VerticalStackLayout>
 
         <RefreshView Grid.Row="3" Command="{Binding LoadCommand}" IsRefreshing="{Binding IsBusy}">
             <CollectionView ItemsSource="{Binding Participants}">
                 <CollectionView.EmptyView>
-                    <Label Text="Sellele treeningule pole veel keegi registreerunud." TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" Margin="0,30" />
+                    <Label Text="{loc:T att.empty}" TextColor="{DynamicResource Muted}" HorizontalTextAlignment="Center" Margin="0,30" />
                 </CollectionView.EmptyView>
                 <CollectionView.ItemsLayout>
                     <LinearItemsLayout Orientation="Vertical" ItemSpacing="8" />
                 </CollectionView.ItemsLayout>
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="vm:ParticipantItem">
-                        <Border Style="{StaticResource Card}" Padding="12,9">
+                        <Border Style="{StaticResource Card}" Padding="12,9" BackgroundColor="{Binding RowBackground}" Stroke="{Binding RowStroke}">
                             <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
-                                <Border BackgroundColor="#E6E8E3" StrokeThickness="0" StrokeShape="Ellipse" WidthRequest="36" HeightRequest="36">
-                                    <Label Text="{Binding Initials}" FontSize="13" FontFamily="OpenSansSemibold" TextColor="{StaticResource Ink}"
+                                <Border BackgroundColor="{DynamicResource Segment}" StrokeThickness="0" StrokeShape="Ellipse" WidthRequest="36" HeightRequest="36">
+                                    <Label Text="{Binding Initials}" FontSize="13" FontFamily="OpenSansSemibold" TextColor="{DynamicResource Ink}"
                                            HorizontalOptions="Center" VerticalOptions="Center" />
                                 </Border>
-                                <Label Grid.Column="1" Text="{Binding Name}" FontSize="15" TextColor="{StaticResource Ink}" VerticalOptions="Center" />
+                                <Label Grid.Column="1" Text="{Binding Name}" FontSize="15" TextColor="{DynamicResource Ink}" VerticalOptions="Center" />
                                 <Button Grid.Column="2" Text="✓" WidthRequest="44" HeightRequest="44" CornerRadius="12" Padding="0"
-                                        BackgroundColor="{Binding PresentBackground}" TextColor="{Binding PresentTextColor}" BorderColor="#D5D8D2" BorderWidth="1"
+                                        BackgroundColor="{Binding PresentBackground}" TextColor="{Binding PresentTextColor}" BorderColor="{DynamicResource Border}" BorderWidth="1"
                                         FontSize="18" SemanticProperties.Description="Kohal"
                                         Command="{Binding Source={RelativeSource AncestorType={x:Type vm:AttendanceViewModel}}, Path=MarkPresentCommand}"
                                         CommandParameter="{Binding .}" />
                                 <Button Grid.Column="3" Text="✕" WidthRequest="44" HeightRequest="44" CornerRadius="12" Padding="0"
-                                        BackgroundColor="{Binding AbsentBackground}" TextColor="{Binding AbsentTextColor}" BorderColor="#D5D8D2" BorderWidth="1"
+                                        BackgroundColor="{Binding AbsentBackground}" TextColor="{Binding AbsentTextColor}" BorderColor="{DynamicResource Border}" BorderWidth="1"
                                         FontSize="18" SemanticProperties.Description="Puudus"
                                         Command="{Binding Source={RelativeSource AncestorType={x:Type vm:AttendanceViewModel}}, Path=MarkAbsentCommand}"
                                         CommandParameter="{Binding .}" />

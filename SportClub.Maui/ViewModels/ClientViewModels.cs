@@ -28,19 +28,19 @@ public partial class LoginViewModel : BaseViewModel
         // client-side validation
         if (string.IsNullOrWhiteSpace(Email) || !Email.Contains('@'))
         {
-            ErrorMessage = "Sisesta korrektne e-posti aadress.";
+            ErrorMessage = Loc.T("login.badEmail");
             return;
         }
         if (string.IsNullOrWhiteSpace(Password))
         {
-            ErrorMessage = "Sisesta parool.";
+            ErrorMessage = Loc.T("login.noPassword");
             return;
         }
 
         var response = await _api.LoginAsync(Email.Trim(), Password);
         if (response.Role is not ("Client" or "Trainer"))
         {
-            ErrorMessage = "Mobiilirakendus on klientidele ja treeneritele. Admin kasutab veebiliidest.";
+            ErrorMessage = Loc.T("login.adminOnly");
             return;
         }
         await _auth.SignInAsync(response, Email.Trim());
@@ -65,7 +65,7 @@ public partial class ScheduleViewModel : BaseViewModel
         _realtime = realtime;
         var today = DateTime.Today;
         for (var i = 0; i < 7; i++) Days.Add(new DayItem(today.AddDays(i)) { IsSelected = i == 0 });
-        Types.Add(new ChipItem(null, "Kõik") { IsSelected = true });
+        Types.Add(new ChipItem(null, Loc.T("schedule.all")) { IsSelected = true });
 
         _realtime.FreeSpotsChanged += (_, m) =>
         {
@@ -86,6 +86,12 @@ public partial class ScheduleViewModel : BaseViewModel
     [RelayCommand]
     private Task LoadAsync() => RunAsync(async () =>
     {
+        // Teema või keel võis seadetes muutuda: päevade ja filtrite värvid ning silt "Kõik" uuesti.
+        foreach (var d in Days) d.RefreshColors();
+        if (Types[0].Label != Loc.T("schedule.all"))
+            Types[0] = new ChipItem(null, Loc.T("schedule.all")) { IsSelected = Types[0].IsSelected };
+        foreach (var t in Types) t.RefreshColors();
+
         if (!_typesLoaded)
         {
             var types = await _api.GetTrainingTypesAsync();
@@ -102,6 +108,14 @@ public partial class ScheduleViewModel : BaseViewModel
         foreach (var s in list.Where(s => s.Start > DateTime.Now)) Sessions.Add(new SessionItem(s));
         IsEmpty = Sessions.Count == 0;
     });
+
+    public override void OnPreferencesChanged()
+    {
+        // Silt "Kõik" / "All" on loodud koodis – vahetame selle uue keele vastu.
+        var all = Types[0];
+        Types[0] = new ChipItem(null, Loc.T("schedule.all")) { IsSelected = all.IsSelected };
+        LoadCommand.Execute(null);
+    }
 
     [RelayCommand]
     private async Task SelectDayAsync(DayItem day)
@@ -177,14 +191,14 @@ public partial class SessionDetailViewModel : BaseViewModel, IQueryAttributable
         var pass = await _api.GetMyPassAsync();
         HasNoPass = pass is null;
         PassInfo = pass is null
-            ? "Registreerumiseks on vaja kehtivat kuukaarti."
-            : $"Registreerumine kasutab 1 külastuse. Kuukaardil on alles {pass.VisitsLeft} / {pass.VisitsTotal}.";
+            ? Loc.T("detail.needPass")
+            : Loc.T("detail.passInfo", pass.VisitsLeft, pass.VisitsTotal);
 
         var mine = (await _api.GetMyBookingsAsync()).FirstOrDefault(b => b.SessionId == _dto.Id);
         IsBooked = mine is not null;
         BookedLabel = mine?.Status == "Waitlisted"
-            ? $"Oled ootejärjekorras, koht #{mine.Position}"
-            : "Sul on sellele treeningule koht ✓";
+            ? Loc.T("detail.inQueue", mine.Position)
+            : Loc.T("detail.hasSpot");
     });
 
     [RelayCommand]
@@ -194,17 +208,19 @@ public partial class SessionDetailViewModel : BaseViewModel, IQueryAttributable
         var result = await _api.BookAsync(_dto.Id);
         IsBooked = true;
         if (result.Waitlisted)
-            await ToastAsync("Treening on täis", $"Sind lisati ootejärjekorda, sinu koht: {result.Position}. Kui koht vabaneb, saad automaatselt treeningule.");
+            await ToastAsync(Loc.T("detail.fullTitle"), Loc.T("detail.fullText", result.Position));
         else
-            await ToastAsync("Registreeritud!", $"{Session?.Name} – {When}. Meeldetuletus tuleb tund enne algust.");
-        await Shell.Current.GoToAsync("..");
+            await ToastAsync(Loc.T("detail.bookedTitle"), Loc.T("detail.bookedText", Session?.Name, When));
+        await GoBackAsync();
     });
 
     [RelayCommand]
     private Task BuyPassAsync() => Shell.Current.GoToAsync("buypass");
 
     [RelayCommand]
-    private Task BackAsync() => Shell.Current.GoToAsync("..");
+    private Task BackAsync() => GoBackAsync();
+
+    public override void OnPreferencesChanged() => Refresh();
 
     /// <summary>Täis treeningul paneb sama registreerumine kliendi automaatselt ootejärjekorda.</summary>
     [RelayCommand]
@@ -226,17 +242,19 @@ public partial class BookingsViewModel : BaseViewModel
         nameof(Tab0Background), nameof(Tab1Background), nameof(Tab2Background))]
     private int selectedTab;
 
-    [ObservableProperty] private string waitlistTitle = "Ootel";
+    [ObservableProperty] private string waitlistTitle = Loc.T("bookings.waitlist");
 
     public bool ShowUpcoming => SelectedTab == 0;
     public bool ShowWaitlist => SelectedTab == 1;
     public bool ShowHistory => SelectedTab == 2;
-    public Color Tab0Background => SelectedTab == 0 ? Colors.White : Colors.Transparent;
-    public Color Tab1Background => SelectedTab == 1 ? Colors.White : Colors.Transparent;
-    public Color Tab2Background => SelectedTab == 2 ? Colors.White : Colors.Transparent;
+    public Color Tab0Background => SelectedTab == 0 ? ThemeService.Get("Surface") : Colors.Transparent;
+    public Color Tab1Background => SelectedTab == 1 ? ThemeService.Get("Surface") : Colors.Transparent;
+    public Color Tab2Background => SelectedTab == 2 ? ThemeService.Get("Surface") : Colors.Transparent;
 
     [RelayCommand]
     private void SelectTab(string index) => SelectedTab = int.Parse(index);
+
+    public override void OnPreferencesChanged() => LoadCommand.Execute(null);
 
     [RelayCommand]
     private Task LoadAsync() => RunAsync(async () =>
@@ -251,13 +269,17 @@ public partial class BookingsViewModel : BaseViewModel
         foreach (var b in all.Where(b => b.Status == "Booked" && b.Start <= now).OrderByDescending(b => b.Start)) History.Add(new BookingItem(b));
         Waitlist.Clear();
         foreach (var w in all.Where(b => b.Status == "Waitlisted")) Waitlist.Add(new WaitlistItem(w));
-        WaitlistTitle = Waitlist.Count > 0 ? $"Ootel ({Waitlist.Count})" : "Ootel";
+        WaitlistTitle = Waitlist.Count > 0 ? Loc.T("bookings.waitlistCount", Waitlist.Count) : Loc.T("bookings.waitlist");
+        OnPropertyChanged(nameof(Tab0Background));
+        OnPropertyChanged(nameof(Tab1Background));
+        OnPropertyChanged(nameof(Tab2Background));
     });
 
     [RelayCommand]
     private async Task CancelAsync(BookingItem item)
     {
-        if (!await Shell.Current.DisplayAlertAsync("Tühista broneering", $"{item.Name}, {item.When}?\nKülastus läheb kuukaardile tagasi.", "Tühista", "Ei")) return;
+        if (!await Shell.Current.DisplayAlertAsync(Loc.T("bookings.cancelTitle"), Loc.T("bookings.cancelText", item.Name, item.When),
+                Loc.T("bookings.cancel"), Loc.T("no"))) return;
         await RunAsync(() => _api.CancelBookingAsync(item.Dto.Id));
         await LoadAsync();
     }
@@ -265,7 +287,8 @@ public partial class BookingsViewModel : BaseViewModel
     [RelayCommand]
     private async Task LeaveAsync(WaitlistItem item)
     {
-        if (!await Shell.Current.DisplayAlertAsync("Lahku järjekorrast", $"{item.Name}, {item.When}?", "Lahku", "Ei")) return;
+        if (!await Shell.Current.DisplayAlertAsync(Loc.T("bookings.leaveTitle"), Loc.T("bookings.leaveText", item.Name, item.When),
+                Loc.T("bookings.leaveButton"), Loc.T("no"))) return;
         // Järjekorrast lahkumine = sama tühistamine (DELETE /api/bookings/{id}).
         await RunAsync(() => _api.CancelBookingAsync(item.Dto.Id));
         await LoadAsync();
@@ -292,7 +315,8 @@ public partial class PassViewModel : BaseViewModel
     [ObservableProperty] private double usedProgress;
     [ObservableProperty] private string upcomingText = "";
     [ObservableProperty] private bool hasUpcoming;
-    [ObservableProperty] private string buyButtonText = "Osta kuukaart";
+    [ObservableProperty] private string buyButtonText = Loc.T("pass.buy");
+    [ObservableProperty] private string visitsTotalText = "";
 
     public ObservableCollection<BookingItem> Visits { get; } = new();
 
@@ -312,11 +336,12 @@ public partial class PassViewModel : BaseViewModel
         HasPass = Pass is not null;
         HasUpcoming = false;
         UpcomingText = "";
-        BuyButtonText = "Osta kuukaart";
+        BuyButtonText = Loc.T("pass.buy");
         if (Pass is not null)
         {
             MonthTitle = Pass.Plan;
-            ValidText = $"Kehtib {Pass.From:dd.MM.yyyy} – {Pass.Until:dd.MM.yyyy}";
+            ValidText = Loc.T("pass.valid", Pass.From, Pass.Until);
+            VisitsTotalText = Loc.T("pass.left", Pass.VisitsTotal);
             UsedProgress = Pass.VisitsTotal == 0 ? 0 : Pass.VisitsLeft / (double)Pass.VisitsTotal;
         }
 
@@ -328,6 +353,8 @@ public partial class PassViewModel : BaseViewModel
 
     [RelayCommand]
     private Task BuyPassAsync() => Shell.Current.GoToAsync("buypass");
+
+    public override void OnPreferencesChanged() => LoadCommand.Execute(null);
 
     [RelayCommand]
     private async Task LogoutAsync()

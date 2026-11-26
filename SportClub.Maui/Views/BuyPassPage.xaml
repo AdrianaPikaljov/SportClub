@@ -1,22 +1,21 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:loc="clr-namespace:SportClub.Maui.Services"
              xmlns:vm="clr-namespace:SportClub.Maui.ViewModels"
              x:Class="SportClub.Maui.Views.BuyPassPage"
              x:DataType="vm:BuyPassViewModel"
              Title="Osta kuukaart"
              Shell.NavBarIsVisible="False"
-             BackgroundColor="{StaticResource Ground}">
+             BackgroundColor="{DynamicResource Ground}">
 
     <Grid RowDefinitions="*,Auto">
         <ScrollView>
             <VerticalStackLayout Padding="20,24,20,16" Spacing="12">
-                <Button Text="‹ Tagasi" Command="{Binding BackCommand}" HorizontalOptions="Start" BackgroundColor="{StaticResource Ink}"
-                        TextColor="{StaticResource Ground}" CornerRadius="12" HeightRequest="40" Padding="14,0" FontFamily="OpenSansSemibold" />
-                <Label Text="Vali pakett" Style="{StaticResource PageTitle}" />
-                <Label Text="Iga broneering kasutab ühe külastuse. Tühistamisel saad külastuse tagasi." FontSize="14" TextColor="{StaticResource Muted}" />
-
-                <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+                <Button Text="{loc:T back}" Command="{Binding BackCommand}" HorizontalOptions="Start" BackgroundColor="{DynamicResource Panel}"
+                        TextColor="{StaticResource OnPanel}" CornerRadius="12" HeightRequest="40" Padding="14,0" FontFamily="OpenSansSemibold" />
+                <Label Text="{loc:T buy.title}" Style="{StaticResource PageTitle}" />
+                <Label Text="{loc:T buy.text}" FontSize="14" TextColor="{DynamicResource Muted}" />
 
                 <VerticalStackLayout Spacing="10" BindableLayout.ItemsSource="{Binding Plans}">
                     <BindableLayout.ItemTemplate>
@@ -40,15 +39,50 @@
                 </VerticalStackLayout>
 
                 <Border Style="{StaticResource Card}" Padding="16,14">
-                    <Label Text="{Binding StartInfo}" FontSize="14" TextColor="{StaticResource Ink2}" />
+                    <Label Text="{Binding StartInfo}" FontSize="14" TextColor="{DynamicResource Ink2}" />
+                </Border>
+
+                <!-- Kaardimakse (simuleeritud). Kaardi andmeid ei salvestata. -->
+                <Border Style="{StaticResource Card}" Padding="16,14">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="{loc:T card.title}" FontFamily="OpenSansSemibold" FontSize="16" TextColor="{DynamicResource Ink}" />
+
+                        <Label Text="{loc:T card.number}" FontSize="13" TextColor="{DynamicResource Muted}" />
+                        <Border Style="{StaticResource DarkInput}">
+                            <Entry Text="{Binding CardNumber}" TextChanged="OnCardNumberChanged" Keyboard="Numeric" MaxLength="23" TextColor="{StaticResource OnPanel}"
+                                   Placeholder="4242 4242 4242 4242" PlaceholderColor="#6E747D" />
+                        </Border>
+
+                        <Label Text="{loc:T card.holder}" FontSize="13" TextColor="{DynamicResource Muted}" />
+                        <Border Style="{StaticResource DarkInput}">
+                            <Entry Text="{Binding CardHolder}" MaxLength="60" TextColor="{StaticResource OnPanel}"
+                                   Placeholder="MARI TAMM" PlaceholderColor="#6E747D" />
+                        </Border>
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12" RowDefinitions="Auto,Auto" RowSpacing="8">
+                            <Label Text="{loc:T card.expiry}" FontSize="13" TextColor="{DynamicResource Muted}" />
+                            <Label Grid.Column="1" Text="CVC" FontSize="13" TextColor="{DynamicResource Muted}" />
+                            <Border Grid.Row="1" Style="{StaticResource DarkInput}">
+                                <Entry Text="{Binding Expiry}" TextChanged="OnExpiryChanged" Keyboard="Numeric" MaxLength="5" TextColor="{StaticResource OnPanel}"
+                                       Placeholder="12/28" PlaceholderColor="#6E747D" />
+                            </Border>
+                            <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource DarkInput}">
+                                <Entry Text="{Binding Cvc}" Keyboard="Numeric" MaxLength="4" IsPassword="True" TextColor="{StaticResource OnPanel}"
+                                       Placeholder="123" PlaceholderColor="#6E747D" />
+                            </Border>
+                        </Grid>
+
+                        <Label Text="{loc:T card.test}" FontSize="12" TextColor="{DynamicResource Muted}" />
+                    </VerticalStackLayout>
                 </Border>
             </VerticalStackLayout>
         </ScrollView>
 
         <VerticalStackLayout Grid.Row="1" Padding="20,8,20,28" Spacing="8">
+            <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
             <Button Text="{Binding BuyText}" Command="{Binding BuyCommand}" IsEnabled="{Binding HasSelection}" Style="{StaticResource AccentButton}" />
-            <Label Text="Makse on simuleeritud – päris raha ei võeta." FontSize="12" TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" />
-            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{StaticResource Ink}" />
+            <Label Text="{loc:T buy.simulated}" FontSize="12" TextColor="{DynamicResource Muted}" HorizontalTextAlignment="Center" />
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" Color="{DynamicResource Ink}" />
         </VerticalStackLayout>
     </Grid>
 </ContentPage>

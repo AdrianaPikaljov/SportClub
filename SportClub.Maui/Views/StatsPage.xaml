@@ -1,53 +1,54 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:loc="clr-namespace:SportClub.Maui.Services"
              xmlns:vm="clr-namespace:SportClub.Maui.ViewModels"
              x:Class="SportClub.Maui.Views.StatsPage"
              x:DataType="vm:StatsViewModel"
              Shell.NavBarIsVisible="False"
-             BackgroundColor="{StaticResource Ground}">
+             BackgroundColor="{DynamicResource Ground}">
 
     <RefreshView Command="{Binding LoadCommand}" IsRefreshing="{Binding IsBusy}">
         <ScrollView>
             <VerticalStackLayout Padding="20,40,20,24" Spacing="14">
-                <Label Text="Statistika" Style="{StaticResource PageTitle}" />
+                <Label Text="{loc:T stats.title}" Style="{StaticResource PageTitle}" />
 
-                <Border BackgroundColor="#E6E8E3" StrokeThickness="0" StrokeShape="RoundRectangle 14" Padding="4">
+                <Border BackgroundColor="{DynamicResource Segment}" StrokeThickness="0" StrokeShape="RoundRectangle 14" Padding="4">
                     <Grid ColumnDefinitions="*,*,*" ColumnSpacing="4">
-                        <Button Text="Nädal" Command="{Binding SelectPeriodCommand}" CommandParameter="0" BackgroundColor="{Binding Tab0Background}" Style="{StaticResource TabButton}" />
-                        <Button Grid.Column="1" Text="Kuu" Command="{Binding SelectPeriodCommand}" CommandParameter="1" BackgroundColor="{Binding Tab1Background}" Style="{StaticResource TabButton}" />
-                        <Button Grid.Column="2" Text="Kõik" Command="{Binding SelectPeriodCommand}" CommandParameter="2" BackgroundColor="{Binding Tab2Background}" Style="{StaticResource TabButton}" />
+                        <Button Text="{loc:T stats.week}" Command="{Binding SelectPeriodCommand}" CommandParameter="0" BackgroundColor="{Binding Tab0Background}" Style="{StaticResource TabButton}" />
+                        <Button Grid.Column="1" Text="{loc:T stats.month}" Command="{Binding SelectPeriodCommand}" CommandParameter="1" BackgroundColor="{Binding Tab1Background}" Style="{StaticResource TabButton}" />
+                        <Button Grid.Column="2" Text="{loc:T stats.all}" Command="{Binding SelectPeriodCommand}" CommandParameter="2" BackgroundColor="{Binding Tab2Background}" Style="{StaticResource TabButton}" />
                     </Grid>
                 </Border>
 
                 <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
 
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                    <Border BackgroundColor="{StaticResource Ink}" StrokeThickness="0" StrokeShape="RoundRectangle 16" Padding="16">
+                    <Border BackgroundColor="{DynamicResource Panel}" StrokeThickness="0" StrokeShape="RoundRectangle 16" Padding="16">
                         <VerticalStackLayout>
-                            <Label Text="{Binding TotalBookings}" FontFamily="OpenSansSemibold" FontSize="30" TextColor="{StaticResource Ground}" />
-                            <Label Text="broneeringut" FontSize="13" TextColor="#B7BCC4" />
+                            <Label Text="{Binding TotalBookings}" FontFamily="OpenSansSemibold" FontSize="30" TextColor="{StaticResource OnPanel}" />
+                            <Label Text="{loc:T stats.bookings}" FontSize="13" TextColor="#B7BCC4" />
                         </VerticalStackLayout>
                     </Border>
                     <Border Grid.Column="1" Style="{StaticResource Card}" Padding="16">
                         <VerticalStackLayout>
-                            <Label Text="{Binding AverageFill}" FontFamily="OpenSansSemibold" FontSize="30" TextColor="{StaticResource Ink}" />
-                            <Label Text="keskmine täituvus" FontSize="13" TextColor="{StaticResource Muted}" />
+                            <Label Text="{Binding AverageFill}" FontFamily="OpenSansSemibold" FontSize="30" TextColor="{DynamicResource Ink}" />
+                            <Label Text="{loc:T stats.fill}" FontSize="13" TextColor="{DynamicResource Muted}" />
                         </VerticalStackLayout>
                     </Border>
                 </Grid>
 
-                <Label Text="Populaarseimad treeningutüübid" FontSize="13" FontFamily="OpenSansSemibold" TextColor="{StaticResource Muted}" Margin="0,4,0,0" />
+                <Label Text="{loc:T stats.popular}" FontSize="13" FontFamily="OpenSansSemibold" TextColor="{DynamicResource Muted}" Margin="0,4,0,0" />
                 <Border Style="{StaticResource Card}" Padding="16">
                     <VerticalStackLayout Spacing="16" BindableLayout.ItemsSource="{Binding Rows}">
                         <BindableLayout.EmptyView>
-                            <Label Text="Andmed puuduvad." TextColor="{StaticResource Muted}" />
+                            <Label Text="{loc:T stats.empty}" TextColor="{DynamicResource Muted}" />
                         </BindableLayout.EmptyView>
                         <BindableLayout.ItemTemplate>
                             <DataTemplate x:DataType="vm:StatItem">
                                 <VerticalStackLayout Spacing="6">
-                                    <Label Text="{Binding Title}" FontFamily="OpenSansSemibold" FontSize="14" TextColor="{StaticResource Ink}" />
-                                    <Label Text="{Binding Detail}" FontSize="12" TextColor="{StaticResource Muted}" />
+                                    <Label Text="{Binding Title}" FontFamily="OpenSansSemibold" FontSize="14" TextColor="{DynamicResource Ink}" />
+                                    <Label Text="{Binding Detail}" FontSize="12" TextColor="{DynamicResource Muted}" />
                                     <ProgressBar Progress="{Binding Progress}" ProgressColor="{Binding BarColor}" HeightRequest="10" />
                                 </VerticalStackLayout>
                             </DataTemplate>

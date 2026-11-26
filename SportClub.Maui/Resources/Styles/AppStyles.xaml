@@ -8,19 +8,19 @@
     <Style x:Key="PageTitle" TargetType="Label">
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
         <Setter Property="FontSize" Value="30" />
-        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+        <Setter Property="TextColor" Value="{DynamicResource Ink}" />
     </Style>
 
     <Style x:Key="ErrorText" TargetType="Label">
-        <Setter Property="TextColor" Value="{StaticResource FullText}" />
-        <Setter Property="BackgroundColor" Value="{StaticResource FullBg}" />
+        <Setter Property="TextColor" Value="{DynamicResource FullText}" />
+        <Setter Property="BackgroundColor" Value="{DynamicResource FullBg}" />
         <Setter Property="Padding" Value="12,10" />
         <Setter Property="FontSize" Value="14" />
     </Style>
 
     <Style x:Key="Card" TargetType="Border">
-        <Setter Property="BackgroundColor" Value="White" />
-        <Setter Property="Stroke" Value="{StaticResource Line}" />
+        <Setter Property="BackgroundColor" Value="{DynamicResource Surface}" />
+        <Setter Property="Stroke" Value="{DynamicResource Line}" />
         <Setter Property="StrokeThickness" Value="1" />
         <Setter Property="StrokeShape" Value="RoundRectangle 16" />
     </Style>
@@ -34,7 +34,7 @@
     </Style>
 
     <Style x:Key="OkTag" TargetType="Border">
-        <Setter Property="BackgroundColor" Value="{StaticResource OkBg}" />
+        <Setter Property="BackgroundColor" Value="{DynamicResource OkBg}" />
         <Setter Property="StrokeThickness" Value="0" />
         <Setter Property="StrokeShape" Value="RoundRectangle 10" />
         <Setter Property="Padding" Value="10,6" />
@@ -42,12 +42,12 @@
     </Style>
 
     <Style x:Key="FewTag" TargetType="Border" BasedOn="{StaticResource OkTag}">
-        <Setter Property="BackgroundColor" Value="{StaticResource FewBg}" />
+        <Setter Property="BackgroundColor" Value="{DynamicResource FewBg}" />
     </Style>
 
     <Style x:Key="AccentButton" TargetType="Button">
         <Setter Property="BackgroundColor" Value="{StaticResource Accent}" />
-        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+        <Setter Property="TextColor" Value="{StaticResource OnAccent}" />
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
         <Setter Property="FontSize" Value="17" />
         <Setter Property="HeightRequest" Value="56" />
@@ -55,15 +55,15 @@
     </Style>
 
     <Style x:Key="DarkButton" TargetType="Button" BasedOn="{StaticResource AccentButton}">
-        <Setter Property="BackgroundColor" Value="{StaticResource Ink}" />
-        <Setter Property="TextColor" Value="{StaticResource Ground}" />
+        <Setter Property="BackgroundColor" Value="{DynamicResource Panel}" />
+        <Setter Property="TextColor" Value="{StaticResource OnPanel}" />
     </Style>
 
     <Style x:Key="DangerButton" TargetType="Button">
-        <Setter Property="BackgroundColor" Value="#FFF6F1" />
-        <Setter Property="BorderColor" Value="#F3C4AC" />
+        <Setter Property="BackgroundColor" Value="{DynamicResource DangerBg}" />
+        <Setter Property="BorderColor" Value="{DynamicResource DangerBorder}" />
         <Setter Property="BorderWidth" Value="1" />
-        <Setter Property="TextColor" Value="{StaticResource FullText}" />
+        <Setter Property="TextColor" Value="{DynamicResource FullText}" />
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
         <Setter Property="FontSize" Value="14" />
         <Setter Property="HeightRequest" Value="44" />
@@ -71,10 +71,10 @@
     </Style>
 
     <Style x:Key="OutlineButton" TargetType="Button">
-        <Setter Property="BackgroundColor" Value="White" />
-        <Setter Property="BorderColor" Value="#D5D8D2" />
+        <Setter Property="BackgroundColor" Value="{DynamicResource Surface}" />
+        <Setter Property="BorderColor" Value="{DynamicResource Border}" />
         <Setter Property="BorderWidth" Value="1" />
-        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+        <Setter Property="TextColor" Value="{DynamicResource Ink}" />
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="HeightRequest" Value="40" />
@@ -83,7 +83,7 @@
     </Style>
 
     <Style x:Key="TabButton" TargetType="Button">
-        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+        <Setter Property="TextColor" Value="{DynamicResource Ink}" />
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="HeightRequest" Value="40" />

@@ -19,18 +19,24 @@ public partial class TrainerSessionsViewModel : BaseViewModel
         _realtime = realtime;
         _realtime.FreeSpotsChanged += (_, m) =>
         {
-            foreach (var s in Sessions.Where(s => s.Id == m.SessionId)) s.FreeSpots = m.Free;
+            foreach (var s in Groups.SelectMany(g => g).Where(s => s.Id == m.SessionId)) s.FreeSpots = m.Free;
             if (Next?.Id == m.SessionId) Next.FreeSpots = m.Free;
         };
     }
 
-    public ObservableCollection<SessionItem> Sessions { get; } = new();
+    /// <summary>
+    /// Grupid: märkimata kohaloluga (esile tõstetud), tulevased, toimunud.
+    /// Iga laadimisega antakse uus nimekiri (mitte Clear/Add) – grupeeritud CollectionView kukkus Windowsis muidu kokku.
+    /// </summary>
+    [ObservableProperty] private List<SessionGroup> groups = new();
 
     [ObservableProperty] private SessionItem? next;
     [ObservableProperty] private bool hasNext;
     [ObservableProperty] private string nextLabel = "";
+    [ObservableProperty] private bool hasUnmarked;
+    [ObservableProperty] private string unmarkedText = "";
 
-    public string Greeting => $"Tere, {_auth.User?.Name.Split(' ')[0]}";
+    public string Greeting => Loc.T("trainer.greeting", _auth.User?.Name.Split(' ')[0]);
 
     [RelayCommand]
     private Task LoadAsync() => RunAsync(async () =>
@@ -39,11 +45,7 @@ public partial class TrainerSessionsViewModel : BaseViewModel
         // API annab kõik treeneri treeningud (uuemad eespool) koos staatusega.
         var list = await _api.GetMyTrainerSessionsAsync();
         var trainerName = _auth.User?.Name ?? "";
-        var items = list
-            .Select(t => new SessionItem(
-                new SessionDto(t.Id, t.Type, 0, trainerName, t.StartsAt, t.DurationMinutes, t.Capacity, t.Capacity - t.Booked),
-                t.Waitlisted > 0 ? $"{t.Status} · ootel {t.Waitlisted}" : t.Status))
-            .ToList();
+        var items = list.Select(ToItem).ToList();
 
         // Järgmine = varaseim treening, mis pole veel lõppenud.
         Next = items.Where(s => s.Dto.Start.AddMinutes(s.Dto.DurationMinutes) > DateTime.Now)
@@ -52,16 +54,46 @@ public partial class TrainerSessionsViewModel : BaseViewModel
         if (Next is not null)
         {
             var minutes = (int)(Next.Dto.Start - DateTime.Now).TotalMinutes;
-            NextLabel = minutes <= 0 ? "Käimas" : minutes < 120 ? $"Järgmine · {minutes} min pärast" : $"Järgmine · {Next.Day}";
+            NextLabel = minutes <= 0 ? Loc.T("trainer.now") : minutes < 120 ? Loc.T("trainer.inMinutes", minutes) : Loc.T("trainer.nextDay", Next.Day);
         }
 
-        Sessions.Clear();
-        foreach (var s in items.Where(s => s != Next)) Sessions.Add(s);
+        // Toimunud treeningud, kus keegi on märkimata, on alati üleval ja punased – nii ei jää ükski märkimata.
+        var now = DateTime.Now;
+        var unmarked = items.Where(s => s.NeedsAttention && s != Next).OrderBy(s => s.Dto.Start).ToList();
+        var upcoming = items.Where(s => s.Dto.Start > now && s != Next).OrderBy(s => s.Dto.Start).ToList();
+        var past = items.Where(s => s.Dto.Start <= now && !s.NeedsAttention && s != Next).OrderByDescending(s => s.Dto.Start).ToList();
+
+        HasUnmarked = unmarked.Count > 0;
+        UnmarkedText = Loc.T("trainer.unmarkedWarning", unmarked.Count, unmarked.Sum(s => s.Unmarked));
+
+        var groups = new List<SessionGroup>();
+        if (unmarked.Count > 0) groups.Add(new SessionGroup(Loc.T("trainer.groupUnmarked", unmarked.Count), true, unmarked));
+        if (upcoming.Count > 0) groups.Add(new SessionGroup(Loc.T("trainer.groupUpcoming"), false, upcoming));
+        if (past.Count > 0) groups.Add(new SessionGroup(Loc.T("trainer.groupPast"), false, past));
+        Groups = groups;
     });
+
+    private SessionItem ToItem(TrainerSessionDto t)
+    {
+        var needsAttention = t.Status == "Kohalolu märkimata" && t.Unmarked > 0;
+        var status = needsAttention
+            ? Loc.T("trainer.unmarkedCount", t.Unmarked, t.Booked)
+            : Loc.TrainerStatus(t.Status);
+        if (t.Waitlisted > 0) status = Loc.T("trainer.waiting", status, t.Waitlisted);
+
+        return new SessionItem(
+            new SessionDto(t.Id, t.Type, 0, _auth.User?.Name ?? "", t.StartsAt, t.DurationMinutes, t.Capacity, t.Capacity - t.Booked), status)
+        {
+            NeedsAttention = needsAttention,
+            Unmarked = t.Unmarked
+        };
+    }
 
     [RelayCommand]
     private Task OpenAsync(SessionItem item) =>
         Shell.Current.GoToAsync("attendance", new Dictionary<string, object> { ["Session"] = item });
+
+    public override void OnPreferencesChanged() => LoadCommand.Execute(null);
 
     [RelayCommand]
     private async Task LogoutAsync()
@@ -84,10 +116,11 @@ public partial class AttendanceViewModel : BaseViewModel, IQueryAttributable
     [ObservableProperty] private int present;
     [ObservableProperty] private int absent;
     [ObservableProperty] private int unmarked;
+    [ObservableProperty] private bool hasUnmarked;
     [ObservableProperty] private bool isEmpty;
 
     public string Title => Session is null ? "" : $"{Session.Name} · {Session.Time}";
-    public string SubTitle => Session is null ? "" : $"{Session.Day} · {Session.Duration} · {Session.BookedText} osalejat";
+    public string SubTitle => Session is null ? "" : Loc.T("att.subtitle", Session.Day, Session.Duration, Session.BookedText);
 
     public void ApplyQueryAttributes(IDictionary<string, object> query)
     {
@@ -109,7 +142,25 @@ public partial class AttendanceViewModel : BaseViewModel, IQueryAttributable
     });
 
     [RelayCommand]
-    private Task BackAsync() => Shell.Current.GoToAsync("..");
+    private Task BackAsync() => GoBackAsync();
+
+    public override void OnPreferencesChanged()
+    {
+        OnPropertyChanged(nameof(SubTitle));
+        LoadCommand.Execute(null);
+    }
+
+    /// <summary>Märgib kõik veel märkimata osalejad kohal olnuks (üks päring).</summary>
+    [RelayCommand]
+    private Task MarkRestPresentAsync() => RunAsync(async () =>
+    {
+        if (Session is null) return;
+        var rest = Participants.Where(p => p.Attended is null).ToList();
+        if (rest.Count == 0) return;
+        await _api.SaveAttendanceAsync(Session.Id, rest.Select(p => p.Dto with { Attended = true }));
+        foreach (var p in rest) p.Attended = true;
+        Recount();
+    });
 
     [RelayCommand]
     private Task MarkPresentAsync(ParticipantItem item) => MarkAsync(item, true);
@@ -129,6 +180,7 @@ public partial class AttendanceViewModel : BaseViewModel, IQueryAttributable
         Present = Participants.Count(p => p.Attended == true);
         Absent = Participants.Count(p => p.Attended == false);
         Unmarked = Participants.Count(p => p.Attended is null);
+        HasUnmarked = Unmarked > 0;
     }
 }
 
@@ -147,9 +199,17 @@ public partial class StatsViewModel : BaseViewModel
     [ObservableProperty] private int totalBookings;
     [ObservableProperty] private string averageFill = "0%";
 
-    public Color Tab0Background => Period == 0 ? Colors.White : Colors.Transparent;
-    public Color Tab1Background => Period == 1 ? Colors.White : Colors.Transparent;
-    public Color Tab2Background => Period == 2 ? Colors.White : Colors.Transparent;
+    public Color Tab0Background => Period == 0 ? ThemeService.Get("Surface") : Colors.Transparent;
+    public Color Tab1Background => Period == 1 ? ThemeService.Get("Surface") : Colors.Transparent;
+    public Color Tab2Background => Period == 2 ? ThemeService.Get("Surface") : Colors.Transparent;
+
+    public override void OnPreferencesChanged()
+    {
+        OnPropertyChanged(nameof(Tab0Background));
+        OnPropertyChanged(nameof(Tab1Background));
+        OnPropertyChanged(nameof(Tab2Background));
+        LoadCommand.Execute(null);
+    }
 
     [RelayCommand]
     private async Task SelectPeriodAsync(string index)
@@ -167,6 +227,9 @@ public partial class StatsViewModel : BaseViewModel
             1 => DateTime.Today.AddMonths(-1),
             _ => null
         };
+        OnPropertyChanged(nameof(Tab0Background));
+        OnPropertyChanged(nameof(Tab1Background));
+        OnPropertyChanged(nameof(Tab2Background));
         var rows = await _api.GetPopularAsync(from);
         var max = rows.Count == 0 ? 0 : rows.Max(r => r.Bookings);
         Rows.Clear();

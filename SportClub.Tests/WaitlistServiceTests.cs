@@ -40,7 +40,8 @@ public class WaitlistServiceTests
     }
 
     private WaitlistService CreateService() => new(_sessions.Object, _bookings.Object, _passes.Object, _notifications.Object,
-        _uow.Object, _notifier.Object, _clock.Object, NullLogger<WaitlistService>.Instance);
+        _uow.Object, _notifier.Object, _clock.Object, NullLogger<WaitlistService>.Instance,
+        new Mock<IEmailSender>().Object);
 
     private void SetBookedCount(int count) =>
         _sessions.Setup(r => r.CountBookedAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(count);

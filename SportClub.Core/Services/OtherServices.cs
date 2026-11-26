@@ -30,10 +30,13 @@ public class WaitlistService : IWaitlistService
     private readonly ISessionNotifier _notifier;
     private readonly IClock _clock;
     private readonly ILogger<WaitlistService> _logger;
+    private readonly IEmailSender _email;
 
     public WaitlistService(ISessionRepository sessions, IBookingRepository bookings, IMonthlyPassRepository passes,
-        INotificationRepository notifications, IUnitOfWork uow, ISessionNotifier notifier, IClock clock, ILogger<WaitlistService> logger)
+        INotificationRepository notifications, IUnitOfWork uow, ISessionNotifier notifier, IClock clock, ILogger<WaitlistService> logger,
+        IEmailSender email)
     {
+        _email = email;
         _sessions = sessions;
         _bookings = bookings;
         _passes = passes;
@@ -98,6 +101,11 @@ public class WaitlistService : IWaitlistService
 
                 free--;
                 promoted.Add(new PromotedDto(entry.Id, session.Id, entry.User?.FullName ?? ""));
+                if (entry.User is not null)
+                {
+                    var (subject, html) = EmailTemplates.Promoted(entry.User, session);
+                    await _email.SendAsync(entry.User.Email, entry.User.FullName, subject, html, ct);
+                }
                 _logger.LogInformation("Waitlist: user {UserId} promoted to session {SessionId}", entry.UserId, session.Id);
             }
 
@@ -113,7 +121,8 @@ public class WaitlistService : IWaitlistService
 public interface IMonthlyPassService
 {
     Task<MyPassDto> GetMyAsync(int userId, CancellationToken ct = default);
-    Task<MyPassDto> BuyAsync(int planId, CurrentUser user, CancellationToken ct = default);
+    /// <summary>Ostab kuukaardi ja maksab kaardiga (simuleeritud). Kaardi andmeid ei salvestata.</summary>
+    Task<MyPassDto> BuyAsync(int planId, CardDetails card, CurrentUser user, CancellationToken ct = default);
     Task<List<PassDto>> SearchAsync(string? search, CancellationToken ct = default);
 }
 
@@ -123,9 +132,16 @@ public class MonthlyPassService : IMonthlyPassService
     private readonly IPassPlanRepository _plans;
     private readonly IUnitOfWork _uow;
     private readonly IClock _clock;
+    private readonly IUserRepository _users;
+    private readonly IPaymentService _payments;
+    private readonly IEmailSender _email;
 
-    public MonthlyPassService(IMonthlyPassRepository passes, IPassPlanRepository plans, IUnitOfWork uow, IClock clock)
+    public MonthlyPassService(IMonthlyPassRepository passes, IPassPlanRepository plans, IUnitOfWork uow, IClock clock,
+        IUserRepository users, IPaymentService payments, IEmailSender email)
     {
+        _users = users;
+        _payments = payments;
+        _email = email;
         _passes = passes;
         _plans = plans;
         _uow = uow;
@@ -140,7 +156,7 @@ public class MonthlyPassService : IMonthlyPassService
     }
 
     /// <summary>Ostab kuukaardi. Kehtib tänasest. Korraga saab olla ainult üks aktiivne kuukaart.</summary>
-    public async Task<MyPassDto> BuyAsync(int planId, CurrentUser user, CancellationToken ct = default)
+    public async Task<MyPassDto> BuyAsync(int planId, CardDetails card, CurrentUser user, CancellationToken ct = default)
     {
         var plan = await _plans.GetByIdAsync(planId, ct);
         if (plan is null || !plan.IsActive) throw new NotFoundException("Tariif", planId);
@@ -150,18 +166,32 @@ public class MonthlyPassService : IMonthlyPassService
             throw new ConflictException("Sul on juba aktiivne kuukaart. Uue saad osta, kui külastused on otsas või kaart on aegunud.",
                 "Kuukaart on juba olemas");
 
+        // Makse (simuleeritud). Kui kaart on vigane või makse lükatakse tagasi, tuleb viga ja kuukaarti ei looda.
+        var payment = _payments.Charge(card, plan.Price);
+
         var pass = new MonthlyPass
         {
             UserId = user.Id,
             PassPlanId = plan.Id,
             PlanName = plan.Name,
             PricePaid = plan.Price,
+            CardBrand = payment.Brand,
+            CardLast4 = payment.Last4,
+            PaymentReference = payment.Reference,
             ValidFrom = now.Date,
             ValidUntil = now.Date.AddDays(plan.Days + 1).AddSeconds(-1), // kehtib kuni viimase päeva lõpuni
             VisitsTotal = plan.Visits
         };
         await _passes.AddAsync(pass, ct);
         await _uow.SaveChangesAsync(ct);
+
+        // Kviitung e-postiga
+        var buyer = await _users.GetByIdAsync(user.Id, ct);
+        if (buyer is not null)
+        {
+            var (subject, html) = EmailTemplates.Receipt(buyer, pass);
+            await _email.SendAsync(buyer.Email, buyer.FullName, subject, html, ct);
+        }
         return pass.ToMyDto();
     }
 
@@ -180,7 +210,7 @@ public interface INotificationService
 }
 
 /// <summary>
-/// Päris e-kirja ei saadeta: meeldetuletus salvestatakse tabelisse Notifications ja kirjutatakse logisse.
+/// Meeldetuletus salvestatakse tabelisse Notifications, kirjutatakse logisse ja saadetakse e-postiga.
 /// Broneering märgitakse "meelde tuletatud", et sama inimene ei saaks seda mitu korda.
 /// </summary>
 public class NotificationService : INotificationService
@@ -190,10 +220,12 @@ public class NotificationService : INotificationService
     private readonly IUnitOfWork _uow;
     private readonly IClock _clock;
     private readonly ILogger<NotificationService> _logger;
+    private readonly IEmailSender _email;
 
     public NotificationService(IBookingRepository bookings, INotificationRepository notifications, IUnitOfWork uow,
-        IClock clock, ILogger<NotificationService> logger)
+        IClock clock, ILogger<NotificationService> logger, IEmailSender email)
     {
+        _email = email;
         _bookings = bookings;
         _notifications = notifications;
         _uow = uow;
@@ -225,6 +257,11 @@ public class NotificationService : INotificationService
         await _uow.SaveChangesAsync(ct);
 
         _logger.LogInformation("Reminder → {Email}: {Message}", booking.User?.Email, notification.Message);
+        if (booking.User is not null)
+        {
+            var (subject, html) = EmailTemplates.Reminder(booking.User, session);
+            await _email.SendAsync(booking.User.Email, booking.User.FullName, subject, html, ct);
+        }
         return new NotificationDto(notification.Id, booking.Id, booking.User?.FullName ?? "", notification.Message, ClubTime.Format(now));
     }
 }
