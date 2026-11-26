@@ -30,7 +30,8 @@ public class ApiClient
     public ApiClient(AuthState auth)
     {
         _auth = auth;
-        _http = new HttpClient { BaseAddress = new Uri(ApiConfig.BaseUrl), Timeout = TimeSpan.FromSeconds(20) };
+        // Aadress võetakse igal päringul uuesti, sest telefonis saab seda sisselogimise lehel muuta.
+        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
     }
 
     // ----- sisselogimine -----
@@ -110,7 +111,7 @@ public class ApiClient
     // ----- plumbing -----
     private async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null, bool auth = true)
     {
-        using var request = new HttpRequestMessage(method, url);
+        using var request = new HttpRequestMessage(method, new Uri(new Uri(ApiConfig.BaseUrl), url));
         if (body is not null) request.Content = JsonContent.Create(body, options: Json);
         if (auth && _auth.Token is not null)
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _auth.Token);

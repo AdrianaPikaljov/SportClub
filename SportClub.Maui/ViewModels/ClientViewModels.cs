@@ -22,6 +22,10 @@ public partial class LoginViewModel : BaseViewModel
     [ObservableProperty] private string email = "";
     [ObservableProperty] private string password = "";
 
+    /// <summary>Serveri aadress – näidatakse ainult telefonis (iPhone/Android).</summary>
+    [ObservableProperty] private string serverUrl = ApiConfig.BaseUrl;
+    public bool ShowServer => ApiConfig.IsPhone;
+
     [RelayCommand]
     private Task LoginAsync() => RunAsync(async () =>
     {
@@ -37,6 +41,12 @@ public partial class LoginViewModel : BaseViewModel
             return;
         }
 
+        if (ShowServer)
+        {
+            ApiConfig.SetBaseUrl(ServerUrl);
+            ServerUrl = ApiConfig.BaseUrl;
+        }
+
         var response = await _api.LoginAsync(Email.Trim(), Password);
         if (response.Role is not ("Client" or "Trainer"))
         {
@@ -50,7 +60,11 @@ public partial class LoginViewModel : BaseViewModel
     });
 
     [RelayCommand]
-    private Task GoToRegisterAsync() => Shell.Current.GoToAsync("register");
+    private Task GoToRegisterAsync()
+    {
+        if (ShowServer) ApiConfig.SetBaseUrl(ServerUrl); // registreerimine kasutab sama serverit
+        return Shell.Current.GoToAsync("register");
+    }
 }
 
 public partial class ScheduleViewModel : BaseViewModel

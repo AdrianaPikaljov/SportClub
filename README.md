@@ -85,6 +85,23 @@ Buying a monthly pass uses a **simulated** card payment – no money moves. The 
 
 Any future expiry (e.g. `12/28`) and any 3-digit CVC work.
 
+## Running the MAUI app on an iPhone
+
+iOS apps are built on a Mac (Xcode). The API keeps running on the Windows PC; the phone connects over Wi‑Fi.
+
+1. On Windows run `start.bat`. The API listens on all network interfaces (launch profile `lan`) and the window
+   prints the address for the phone, e.g. `http://192.168.1.15:5080`. Allow `dotnet` in Windows Firewall (private network).
+2. On the Mac install Xcode (App Store), the .NET 10 SDK and the MAUI workload: `sudo dotnet workload install maui`.
+3. In Xcode create any empty iOS app with the bundle id you will use (e.g. `ee.yourname.sportclub`), choose your
+   Apple ID as *Personal Team* and run it once on the iPhone – this creates the signing certificate and profile.
+4. On the iPhone enable *Settings → Privacy & Security → Developer Mode*.
+5. Build and install from the `SportClub.Maui` folder:
+   `dotnet build -t:Run -f net10.0-ios -p:RuntimeIdentifier=ios-arm64 -p:ApplicationId=ee.yourname.sportclub -p:_DeviceName=<UDID>`
+   (UDID: `xcrun devicectl list devices`).
+6. On the login screen enter the server address shown by `start.bat`.
+
+With a free Apple ID the app works for 7 days, then it has to be installed again.
+
 ## API
 
 | Method | Endpoint | Who |

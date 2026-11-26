@@ -11,9 +11,9 @@ echo.
 where dotnet >nul 2>nul || (echo [VIGA] .NET SDK puudub. Paigalda .NET 10 SDK. & pause & exit /b 1)
 where npm >nul 2>nul || (echo [VIGA] Node.js puudub. Paigalda Node.js. & pause & exit /b 1)
 
-rem ---- 1. Web API (http://localhost:5080) ----
+rem ---- 1. Web API (http://localhost:5080, telefonile ka arvuti IP kaudu) ----
 echo [1/4] Kaivitan Web API ...
-start "SportClub API" cmd /k "dotnet run --project SportClub.Api --launch-profile http"
+start "SportClub API" cmd /k "dotnet run --project SportClub.Api --launch-profile lan"
 
 rem Ootame, kuni API vastab (esimene kaivitus votab kauem, sest projekt kompileeritakse).
 echo       Ootan, kuni API on valmis ...
@@ -54,8 +54,18 @@ timeout /t 5 /nobreak >nul
 start "" http://localhost:5080/swagger
 start "" http://localhost:5173
 
+rem Arvuti IP kohtvorgus – selle aadressi sisestab telefon (iPhone/Android) sisselogimise lehel.
+set "LANIP="
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "(Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null } | Select-Object -First 1).IPv4Address.IPAddress"`) do set "LANIP=%%i"
+
 echo.
 echo Koik on kaivitatud. Iga osa tootab oma aknas.
 echo Peatamiseks kaivita stop.bat (voi sulge aknad).
 echo.
-timeout /t 8 >nul
+if defined LANIP (
+    echo Telefonis serveri aadress:  http://%LANIP%:5080
+    echo Telefon ja arvuti peavad olema samas WiFi-vorgus.
+    echo Kui Windows kusib tulemuuri kohta, vali "Luba" ^(Private network^).
+)
+echo.
+timeout /t 60 >nul

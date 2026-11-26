@@ -4,12 +4,45 @@ namespace SportClub.Maui.Services;
 
 public static class ApiConfig
 {
+    private const string UrlKey = "api_url";
+
+    /// <summary>Telefonis (iPhone, Android) saab serveri aadressi sisselogimise lehel muuta.</summary>
+    public static bool IsPhone => DeviceInfo.Platform == DevicePlatform.iOS || DeviceInfo.Platform == DevicePlatform.Android;
+
     /// <summary>
-    /// Android emulator sees the PC's localhost as 10.0.2.2.
-    /// On a real phone use the PC's IP address (and run the API with --urls http://0.0.0.0:5080).
+    /// Windowsis on API samas arvutis (localhost). Android emulaator näeb arvuti localhost-i kui 10.0.2.2.
+    /// Päris telefonis tuleb sisestada arvuti IP-aadress (start.bat näitab seda), nt http://192.168.1.15:5080.
     /// </summary>
-    public static string BaseUrl =>
+    public static string DefaultUrl =>
         DeviceInfo.Platform == DevicePlatform.Android ? "http://10.0.2.2:5080/" : "http://localhost:5080/";
+
+    public static string BaseUrl
+    {
+        get
+        {
+            var saved = IsPhone ? Preferences.Default.Get(UrlKey, "") : "";
+            return string.IsNullOrWhiteSpace(saved) ? DefaultUrl : saved;
+        }
+    }
+
+    /// <summary>Salvestab aadressi. Lubab ka lühikuju "192.168.1.15" – lisame http:// ja pordi 5080.</summary>
+    public static void SetBaseUrl(string? text)
+    {
+        var url = (text ?? "").Trim();
+        if (url.Length == 0)
+        {
+            Preferences.Default.Remove(UrlKey);
+            return;
+        }
+        if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            url = "http://" + url;
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            var port = uri.IsDefaultPort && !url.Contains(":" + uri.Port) ? 5080 : uri.Port;
+            url = $"{uri.Scheme}://{uri.Host}:{port}/";
+        }
+        Preferences.Default.Set(UrlKey, url);
+    }
 
     public static string WebSocketUrl => BaseUrl.Replace("http://", "ws://").Replace("https://", "wss://") + "ws/sessions";
 }

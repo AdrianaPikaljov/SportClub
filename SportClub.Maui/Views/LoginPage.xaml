@@ -31,6 +31,12 @@
         </VerticalStackLayout>
 
         <VerticalStackLayout Grid.Row="3" Spacing="12">
+            <!-- Ainult telefonis: arvuti aadress, kus API töötab (start.bat näitab seda) -->
+            <Label Text="{loc:T login.server}" FontSize="13" TextColor="#B7BCC4" IsVisible="{Binding ShowServer}" />
+            <Border Style="{StaticResource DarkInput}" IsVisible="{Binding ShowServer}">
+                <Entry Text="{Binding ServerUrl}" Keyboard="Url" TextColor="{StaticResource OnPanel}" Placeholder="http://192.168.1.15:5080"
+                       PlaceholderColor="#6E747D" />
+            </Border>
             <Label Text="{loc:T login.email}" FontSize="13" TextColor="#B7BCC4" />
             <Border Style="{StaticResource DarkInput}">
                 <Entry Text="{Binding Email}" Keyboard="Email" TextColor="{StaticResource OnPanel}" Placeholder="nimi@example.com"
