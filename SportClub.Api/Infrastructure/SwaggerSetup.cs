@@ -47,6 +47,7 @@ public class RoleInfoOperationFilter : IOperationFilter
         if (method.GetCustomAttribute<AllowAnonymousAttribute>() is not null || !attrs.OfType<AuthorizeAttribute>().Any())
         {
             operation.Description = Prepend("🔓 **Sisselogimine pole vajalik.**", operation.Description);
+            operation.Extensions["x-roles"] = new OpenApiString("*"); // kõigile, ka külalisele
             return;
         }
 
@@ -58,6 +59,8 @@ public class RoleInfoOperationFilter : IOperationFilter
             : string.Join(", ", roles.Split(',').Select(r => RoleNames.GetValueOrDefault(r.Trim(), r.Trim())));
 
         operation.Description = Prepend($"🔒 **Kes saab kasutada:** {who}", operation.Description);
+        // Swaggeri lehel peidetakse otspunktid, mida sisseloginud roll kasutada ei saa (vt SwaggerRoleFilter).
+        operation.Extensions["x-roles"] = new OpenApiString(roles is null ? "any" : string.Join(",", roles.Split(',').Select(r => r.Trim())));
         operation.Security = new List<OpenApiSecurityRequirement>
         {
             new()
@@ -103,6 +106,97 @@ public class TagOrderDocumentFilter : IDocumentFilter
     {
         doc.Tags = ApiTags.All.Select(t => new OpenApiTag { Name = t.Name, Description = t.Description }).ToList();
     }
+}
+
+/// <summary>
+/// Swaggeri lehele lisatav skript: näitab ainult neid otspunkte, mida praegune kasutaja saab kasutada.
+/// Külaline (pole Authorize vajutanud) näeb ainult avatud otspunkte, Klient lisaks kliendi omi jne.
+/// Roll võetakse Authorize all olevast JWT-st, otspunkti rollid swagger.json-i väljast "x-roles".
+/// </summary>
+public static class SwaggerRoleFilter
+{
+    public const string Path = "/swagger-roles.js";
+
+    public const string Script = """
+        (function () {
+          var ROLE_CLAIMS = ['role', 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role'];
+          var NAMES = { Guest: 'Külaline', Client: 'Klient', Trainer: 'Treener', Admin: 'Admin', Service: 'Taustateenus' };
+          var rolesByOp = null;
+
+          fetch('/swagger/v1/swagger.json').then(function (r) { return r.json(); }).then(function (doc) {
+            rolesByOp = {};
+            Object.keys(doc.paths || {}).forEach(function (path) {
+              Object.keys(doc.paths[path]).forEach(function (method) {
+                var op = doc.paths[path][method];
+                rolesByOp[method.toLowerCase() + ' ' + path] = (op && op['x-roles']) || '*';
+              });
+            });
+          });
+
+          function currentRole() {
+            try {
+              var auth = JSON.parse(localStorage.getItem('authorized') || '{}');
+              var token = auth.Bearer && auth.Bearer.value;
+              if (!token) return 'Guest';
+              var part = token.replace(/^Bearer\s+/i, '').split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+              while (part.length % 4) part += '=';
+              var payload = JSON.parse(decodeURIComponent(escape(atob(part))));
+              if (payload.exp && payload.exp * 1000 < Date.now()) return 'Guest';
+              for (var i = 0; i < ROLE_CLAIMS.length; i++) {
+                var r = payload[ROLE_CLAIMS[i]];
+                if (r) return Array.isArray(r) ? r[0] : r;
+              }
+              return 'Guest';
+            } catch (e) { return 'Guest'; }
+          }
+
+          function allowed(roles, role) {
+            if (roles === '*') return true;
+            if (role === 'Guest') return false;
+            if (roles === 'any') return true;
+            return roles.split(',').indexOf(role) >= 0;
+          }
+
+          function banner(role) {
+            var el = document.getElementById('sc-role-banner');
+            if (!el) {
+              var info = document.querySelector('.swagger-ui .information-container');
+              if (!info) return;
+              el = document.createElement('div');
+              el.id = 'sc-role-banner';
+              el.style.cssText = 'margin:12px 0;padding:12px 16px;border-radius:8px;background:#e8f4ff;border:1px solid #9cc9f5;font:14px sans-serif';
+              info.parentNode.insertBefore(el, info.nextSibling);
+            }
+            var text = role === 'Guest'
+              ? '👤 Vaade: <b>Külaline</b> – näed ainult avatud otspunkte. Logi sisse ja vajuta <b>Authorize</b>, et näha oma rolli otspunkte.'
+              : '👤 Vaade: <b>' + (NAMES[role] || role) + '</b> – näed ainult otspunkte, mida see roll saab kasutada.';
+            if (el.innerHTML !== text) el.innerHTML = text;
+          }
+
+          function apply() {
+            if (!rolesByOp) return;
+            var role = currentRole();
+            banner(role);
+            document.querySelectorAll('.swagger-ui .opblock').forEach(function (block) {
+              var methodClass = Array.prototype.find.call(block.classList, function (c) { return /^opblock-(get|post|put|patch|delete)$/.test(c); });
+              var pathEl = block.querySelector('.opblock-summary-path');
+              if (!methodClass || !pathEl) return;
+              var path = pathEl.getAttribute('data-path') || pathEl.textContent.trim();
+              var roles = rolesByOp[methodClass.replace('opblock-', '') + ' ' + path] || '*';
+              block.style.display = allowed(roles, role) ? '' : 'none';
+            });
+            // peida grupid, kus pole ühtegi nähtavat otspunkti
+            document.querySelectorAll('.swagger-ui .opblock-tag-section').forEach(function (section) {
+              var blocks = section.querySelectorAll('.opblock');
+              if (!blocks.length) return; // suletud grupp – ei tea sisu, jätame alles
+              var visible = Array.prototype.some.call(blocks, function (b) { return b.style.display !== 'none'; });
+              section.style.display = visible ? '' : 'none';
+            });
+          }
+
+          setInterval(apply, 400);
+        })();
+        """;
 }
 
 public static class SwaggerSetup

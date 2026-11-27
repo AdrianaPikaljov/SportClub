@@ -129,6 +129,7 @@ app.UseSwaggerUI(c =>
     c.EnableTryItOutByDefault();         // fields are editable right away
     c.DisplayRequestDuration();
     c.EnablePersistAuthorization();      // token stays after page refresh
+    c.InjectJavascript(SwaggerRoleFilter.Path); // näitab ainult praeguse rolli otspunkte
 });
 
 app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(30) });
@@ -152,6 +153,8 @@ app.Map("/ws/sessions", async (HttpContext context, WebSocketSessionNotifier not
 
 app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 // Mobiilirakendus otsib selle abil kohtvõrgust serverit üles (vastus näitab, et see on SportClubi API).
+// Swaggeri lehe skript (vt SwaggerRoleFilter)
+app.MapGet(SwaggerRoleFilter.Path, () => Results.Content(SwaggerRoleFilter.Script, "text/javascript")).AllowAnonymous().ExcludeFromDescription();
 app.MapGet("/api/ping", () => Results.Ok(new { app = "SportClub" })).AllowAnonymous().ExcludeFromDescription();
 
 app.Run();

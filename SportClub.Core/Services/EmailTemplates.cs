@@ -12,6 +12,21 @@ public static class EmailTemplates
             $"<p>Sinu konto on loodud. Logi rakendusse sisse e-postiga <b>{E(user.Email)}</b>.</p>" +
             "<p>Järgmine samm: osta kuukaart ja registreeru treeningutele.</p>"));
 
+    /// <summary>Admin lõi treeneri – tal on nüüd oma konto. Parooli kirja ei panda, selle annab administraator.</summary>
+    public static (string Subject, string Html) TrainerWelcome(User user) => (
+        "Sinu SportClubi treeneri konto",
+        Layout(user.FullName,
+            $"<p>Administraator lõi sulle SportClubis treeneri konto. Logi rakendusse sisse e-postiga <b>{E(user.Email)}</b> " +
+            "ja parooliga, mille said administraatorilt.</p>" +
+            "<p>Rakenduses näed oma treeninguid, osalejate nimekirja ja saad märkida kohalolu.</p>"));
+
+    /// <summary>Admin muutis treeneri parooli.</summary>
+    public static (string Subject, string Html) PasswordChanged(User user) => (
+        "Sinu SportClubi parool muudeti",
+        Layout(user.FullName,
+            $"<p>Administraator muutis sinu konto (<b>{E(user.Email)}</b>) parooli. Uue parooli saad administraatorilt.</p>" +
+            "<p>Kui sa seda ei oodanud, võta ühendust klubiga.</p>"));
+
     public static (string Subject, string Html) Receipt(User user, MonthlyPass pass) => (
         $"Kviitung: {pass.PlanName}",
         Layout(user.FullName,

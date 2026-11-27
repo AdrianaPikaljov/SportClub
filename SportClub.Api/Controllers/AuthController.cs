@@ -66,4 +66,29 @@ public class AuthController : ControllerBase
     [ProducesResponseType<List<UserDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<UserDto>>> Users([FromQuery] string? search, CancellationToken ct) =>
         Ok(await _auth.SearchUsersAsync(search, ct));
+
+    /// <summary>Kustuta kasutaja</summary>
+    /// <remarks>
+    /// Kustutab kasutaja koos tema broneeringute, ootejärjekorra kohtade, kuukaartide ja teavitustega.
+    /// Vabanenud kohtade arv saadetakse kohe kõigile (WebSocket), ootejärjekorra järgmise viib kohale Worker.
+    ///
+    /// Ei saa kustutada: iseennast (400), taustateenuse kontot (409) ja treenerit – treener kustutatakse
+    /// koos kontoga DELETE /api/trainers/{id} kaudu (409).
+    /// </remarks>
+    /// <response code="204">Kustutatud.</response>
+    /// <response code="400">Iseennast ei saa kustutada.</response>
+    /// <response code="404">Sellist kasutajat pole.</response>
+    /// <response code="409">Taustateenuse või treeneri konto.</response>
+    [HttpDelete("api/users/{id:int}")]
+    [Authorize(Roles = Roles.Admin)]
+    [Tags(ApiTags.Admin)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeleteUser(int id, CancellationToken ct)
+    {
+        await _auth.DeleteUserAsync(id, User.ToCurrentUser(), ct);
+        return NoContent();
+    }
 }

@@ -25,10 +25,12 @@ public class TrainerService : ITrainerService
     private readonly IPasswordService _passwords;
     private readonly IUnitOfWork _uow;
     private readonly IClock _clock;
+    private readonly IEmailSender _email;
 
     public TrainerService(ITrainerRepository trainers, IUserRepository users, ISessionRepository sessions,
-        IPasswordService passwords, IUnitOfWork uow, IClock clock)
+        IPasswordService passwords, IUnitOfWork uow, IClock clock, IEmailSender email)
     {
+        _email = email;
         _trainers = trainers;
         _users = users;
         _sessions = sessions;
@@ -69,6 +71,10 @@ public class TrainerService : ITrainerService
         await _users.AddAsync(user, ct);
         await _trainers.AddAsync(trainer, ct);
         await _uow.SaveChangesAsync(ct);
+
+        // Treener saab kirja, et tal on nüüd konto
+        var (subject, html) = EmailTemplates.TrainerWelcome(user);
+        await _email.SendAsync(user.Email, user.FullName, subject, html, ct);
         return trainer.ToDto(includeEmail: true);
     }
 
@@ -100,10 +106,17 @@ public class TrainerService : ITrainerService
 
         trainer.User.FullName = trainer.FullName;
         trainer.User.Email = email;
-        if (!string.IsNullOrWhiteSpace(dto.NewPassword))
-            trainer.User.PasswordHash = _passwords.Hash(trainer.User, dto.NewPassword);
+        var passwordChanged = !string.IsNullOrWhiteSpace(dto.NewPassword);
+        if (passwordChanged)
+            trainer.User.PasswordHash = _passwords.Hash(trainer.User, dto.NewPassword!);
 
         await _uow.SaveChangesAsync(ct);
+
+        if (passwordChanged)
+        {
+            var (subject, html) = EmailTemplates.PasswordChanged(trainer.User);
+            await _email.SendAsync(trainer.User.Email, trainer.User.FullName, subject, html, ct);
+        }
         return trainer.ToDto(includeEmail: true);
     }
 
@@ -274,6 +287,8 @@ public interface IAuthService
     Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken ct = default);
     Task<UserDto> RegisterAsync(RegisterRequest request, CancellationToken ct = default);
     Task<List<UserDto>> SearchUsersAsync(string? search, CancellationToken ct = default);
+    /// <summary>Kustutab kasutaja koos tema broneeringute, kuukaartide ja teavitustega (ainult admin).</summary>
+    Task DeleteUserAsync(int id, CurrentUser admin, CancellationToken ct = default);
 }
 
 public class AuthService : IAuthService
@@ -284,16 +299,56 @@ public class AuthService : IAuthService
     private readonly IUnitOfWork _uow;
     private readonly IClock _clock;
     private readonly IEmailSender _email;
+    private readonly IBookingRepository _bookings;
+    private readonly ISessionRepository _sessions;
+    private readonly ISessionNotifier _notifier;
 
     public AuthService(IUserRepository users, IPasswordService passwords, ITokenService tokens, IUnitOfWork uow, IClock clock,
-        IEmailSender email)
+        IEmailSender email, IBookingRepository bookings, ISessionRepository sessions, ISessionNotifier notifier)
     {
         _email = email;
+        _bookings = bookings;
+        _sessions = sessions;
+        _notifier = notifier;
         _users = users;
         _passwords = passwords;
         _tokens = tokens;
         _uow = uow;
         _clock = clock;
+    }
+
+    /// <summary>
+    /// Kustutab kasutaja. Reeglid: iseennast ei saa kustutada; taustateenuse kontot ei saa (Worker vajab seda);
+    /// treeneri konto kustutatakse koos treeneriga (Treenerid → Kustuta). Kliendi broneeringud, ootejärjekorra kohad,
+    /// kuukaardid ja teavitused kustuvad andmebaasis koos temaga (cascade). Vabanenud kohad saadetakse kohe WebSocketiga,
+    /// ootejärjekorra järgmise viib kohale Worker.
+    /// </summary>
+    public async Task DeleteUserAsync(int id, CurrentUser admin, CancellationToken ct = default)
+    {
+        var user = await _users.GetByIdAsync(id, ct) ?? throw new NotFoundException("Kasutaja", id);
+        if (user.Id == admin.Id)
+            throw new BusinessRuleException("Iseennast ei saa kustutada.");
+        if (user.Role == Roles.Service)
+            throw new ConflictException("Taustateenuse kontot ei saa kustutada – Worker kasutab seda.", "Ei saa kustutada");
+        if (user.Role == Roles.Trainer)
+            throw new ConflictException("Treeneri konto kustutatakse koos treeneriga: Treenerid → Kustuta.", "Ei saa kustutada");
+
+        // Tulevased broneeringud – pärast kustutamist teatame nende treeningute vabade kohtade arvu.
+        var now = _clock.Now;
+        var freed = (await _bookings.GetAllForUserAsync(id, ct) ?? new List<Booking>())
+            .Where(b => b.Status == BookingStatus.Booked && b.Session is not null && b.Session.StartsAt > now)
+            .Select(b => b.Session!)
+            .GroupBy(s => s.Id).Select(g => g.First())
+            .ToList();
+
+        _users.Remove(user);
+        await _uow.SaveChangesAsync(ct);
+
+        foreach (var session in freed)
+        {
+            var booked = await _sessions.CountBookedAsync(session.Id, ct);
+            await _notifier.FreeSpotsChangedAsync(session.Id, Math.Max(0, session.Capacity - booked), ct);
+        }
     }
 
     public async Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)

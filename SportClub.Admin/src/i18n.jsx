@@ -69,6 +69,7 @@ const texts = {
     'passes.empty': 'Kuukaarte ei leitud.', 'passes.card': 'Kaart',
     // kasutajad
     'users.title': 'Kasutajad', 'users.email': 'E-post', 'users.role': 'Roll', 'users.empty': 'Kasutajaid ei leitud.',
+    'users.confirmDelete': 'Kustutada kasutaja {name}?\nKustutatakse ka tema broneeringud, ootejärjekorra kohad ja kuukaardid.', 'users.trainerHint': 'Kustuta Treenerite lehel',
     'role.Admin': 'Admin', 'role.Trainer': 'Treener', 'role.Client': 'Klient', 'role.Service': 'Taustateenus',
     // statistika
     'stats.title': 'Populaarseimad treeningud', 'stats.bookings': 'broneeringut', 'stats.attended': 'käis kohal',
@@ -132,6 +133,7 @@ const texts = {
     'passes.plan': 'Plan', 'passes.left': '{left} / {total} left', 'passes.active': 'Active', 'passes.inactive': 'Not valid',
     'passes.empty': 'No passes found.', 'passes.card': 'Card',
     'users.title': 'Users', 'users.email': 'E-mail', 'users.role': 'Role', 'users.empty': 'No users found.',
+    'users.confirmDelete': 'Delete user {name}?\nTheir bookings, waitlist places and passes are deleted too.', 'users.trainerHint': 'Delete on the Trainers page',
     'role.Admin': 'Admin', 'role.Trainer': 'Trainer', 'role.Client': 'Client', 'role.Service': 'Background service',
     'stats.title': 'Most popular trainings', 'stats.bookings': 'bookings', 'stats.attended': 'attended',
     'stats.fill': 'average fill rate', 'stats.row': '{bookings} bookings · {sessions} trainings · attended {attended} · fill {fill}%',

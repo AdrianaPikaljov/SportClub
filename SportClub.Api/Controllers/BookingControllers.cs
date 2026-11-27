@@ -193,8 +193,9 @@ public class NotificationsController : ControllerBase
 
     /// <summary>Saada meeldetuletus ühele osalejale</summary>
     /// <remarks>
-    /// bookingId võta GET /api/sessions/starting vastusest. Päris e-kirja ei saadeta: meeldetuletus salvestatakse
-    /// tabelisse Notifications ja logisse ning broneering märgitakse "meelde tuletatud".
+    /// bookingId võta GET /api/sessions/starting vastusest. Osalejale saadetakse **päris e-kiri** (Gmail, kui
+    /// appsettings.Local.json on seadistatud), meeldetuletus salvestatakse ka tabelisse Notifications ja logisse
+    /// ning broneering märgitakse "meelde tuletatud" (teist korda sama broneeringu kohta → 409).
     /// </remarks>
     /// <response code="201">Saadetud.</response>
     /// <response code="400">See on järjekorrakoht, mitte osaleja.</response>

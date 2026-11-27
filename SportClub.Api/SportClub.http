@@ -227,6 +227,10 @@ Authorization: Bearer {{adminToken}}
 GET {{host}}/api/users?search=tamm
 Authorization: Bearer {{adminToken}}
 
+### Kustuta kasutaja (klient; iseennast/treenerit/taustateenust ei saa)
+DELETE {{host}}/api/users/9
+Authorization: Bearer {{adminToken}}
+
 ### Statistika (admin – kogu klubi)
 GET {{host}}/api/stats/popular?from=2026-11-01
 Authorization: Bearer {{adminToken}}
